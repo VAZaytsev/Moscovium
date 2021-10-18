@@ -32,6 +32,8 @@ where ![equation](https://latex.codecogs.com/gif.latex?D_h) is the diagonal matr
 
 of the circuit
 
+![alt text](pictures/c_vec_circ.png)
+
 # Notes
 
 To launch the code type:

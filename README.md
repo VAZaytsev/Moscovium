@@ -1,3 +1,5 @@
+![equation](https://latex.codecogs.com/gif.latex?U%28%5Cvec%7B%5Ctheta%7D%29%20%3D%20U_N%20%5Cdots%20U_0)
+
 # Notes
 
 To launch the code type:

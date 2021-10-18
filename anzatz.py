@@ -12,6 +12,84 @@ IXYZ = {
 
 
 # ===================================================================
+def XYZ_vec(tp, q, vec):
+  if tp == 1:
+    mask = [i ^ (1 << q) for i in range(len(vec))]
+
+    return vec[mask]
+
+  if tp == 2: 
+    mask = [i ^ (1 << q) for i in range(len(vec))]
+    sgn = np.array([ 1j if (i & (1<<q)) == 0 else 
+                    -1j for i in range(len(vec))])
+
+    return vec[mask] * sgn[mask]
+
+  if tp == 3:
+    return vec * np.array([ 1 if (i & (1<<q)) == 0 else 
+                           -1 for i in range(len(vec))])
+
+  exit("Wrong input for XYZ_vec! Abort")
+# ===================================================================
+
+
+
+
+# ===================================================================
+def CX_vec(ctrl, targ, vec):
+  mask = [i ^ (1 << targ) if (i & (1<<ctrl)) != 0 else 
+          i for i in range(len(vec))]
+
+  return vec[mask]
+# ===================================================================
+
+
+
+
+# ===================================================================
+def oCX_vec(ctrl, targ, vec):
+  mask = [i ^ (1 << targ) if (i & (1<<ctrl)) == 0 else 
+          i for i in range(len(vec))]
+
+  return vec[mask]
+# ===================================================================
+
+
+
+
+# ===================================================================
+def Rq_vec(tp, theta, q, vec):
+  if tp == 2: 
+    mask = [i ^ (1 << q) for i in range(len(vec))]
+    sgn = np.array([ 1 if (i & (1<<q)) == 0 else 
+                    -1 for i in range(len(vec))])
+
+    return math.cos(0.5*theta) * vec \
+         + math.sin(0.5*theta) * vec[mask] * sgn[mask]
+
+  if tp == 3:
+    z1 = cmath.exp(-1j*0.5*theta)
+    z2 = cmath.exp( 1j*0.5*theta)
+
+    return vec * np.array([z1 if (i & (1<<q)) == 0 else 
+                           z2 for i in range(len(vec))])
+  
+  if tp == 1: 
+    mask = [i ^ (1 << q) for i in range(len(vec))]
+
+    return math.cos(0.5*theta) * vec \
+         - 1j * math.sin(0.5*theta) * vec[mask]
+
+  if tp == 0:
+    return vec
+
+  exit("Wrong input for Rq_vec! Abort")
+# ===================================================================
+
+
+
+
+# ===================================================================
 def one_qubit_rot_mtrx(tp, theta):
   if tp == 0:
     return np.identity((2))
@@ -29,8 +107,7 @@ def one_qubit_rot_mtrx(tp, theta):
   if tp == 3:
     return np.array([[cmath.exp(-1j*0.5*theta),0],[0, cmath.exp(1j*0.5*theta)]])
 
-  print("Wrong input for rot_mtrx_sub! Abort")
-  exit()
+  exit("Wrong input for rot_mtrx_sub! Abort")
 # ===================================================================
 
 
@@ -53,7 +130,10 @@ def two_qubit_rot_mtrx(theta):
 # ===================================================================
 def deriv_mtrx(anzatz_tp, rot, nq):
   sz = 2**nq
-  
+
+  if anzatz_tp == 2:
+    return None
+
   if anzatz_tp == 0:
     mtrx = np.zeros((nq, 4, sz, sz),dtype = complex)
 
@@ -175,6 +255,43 @@ def apply_anzatz(anzatz_tp, rot, nlayers, ang, nq, psi_i, Uent=None):
       psi_f = mtrx.dot(psi_f)
 
     return psi_f
+  
+#  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+  if anzatz_tp == 2:
+    psi_f = Rq_vec(2, ang[0], 0, psi_f)
+    
+    for ctrl in range(6):
+      psi_f = CX_vec(ctrl, ctrl+1, psi_f)
+
+    psi_f = Rq_vec(2, 0.5*ang[1], 1, psi_f)
+    psi_f = CX_vec(0, 1, psi_f)
+    psi_f = Rq_vec(2,-0.5*ang[1], 1, psi_f)
+    psi_f = CX_vec(0, 1, psi_f)
+
+    psi_f = CX_vec(2, 3, psi_f)
+
+    psi_f = Rq_vec(2, 0.5*ang[2], 5, psi_f)
+    psi_f = CX_vec(4, 5, psi_f)
+    psi_f = Rq_vec(2,-0.5*ang[2], 5, psi_f)
+    psi_f = CX_vec(4, 5, psi_f)
+
+    psi_f = XYZ_vec(1, 3, psi_f)
+    
+    psi_f = oCX_vec(1, 2, psi_f)
+    psi_f = oCX_vec(2, 3, psi_f)
+    psi_f = oCX_vec(3, 4, psi_f)
+
+    psi_f = Rq_vec(2, 0.5*ang[3], 5, psi_f)
+    psi_f = CX_vec(4, 5, psi_f)
+    psi_f = Rq_vec(2,-0.5*ang[3], 5, psi_f)
+    psi_f = CX_vec(4, 5, psi_f)
+
+    psi_f = oCX_vec(3, 4, psi_f)
+    psi_f = oCX_vec(2, 3, psi_f)
+    
+    psi_f = oCX_vec(5, 6, psi_f)
+
+    return psi_f
 # ===================================================================
 
 
@@ -239,6 +356,10 @@ def anzatz_matrices(anzatz_tp, rot, nlayers, ang, nq):
       mtrx_out[ilayer,1,:,:] = mtrx.copy()
 
     return mtrx_out
+
+#  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+  if anzatz_tp == 2:
+    return None
 # ===================================================================
 
 
@@ -289,6 +410,66 @@ def apply_danzatz(anzatz_tp, rot, nlayers, ang, nq,
 
         if a_layer == ilayer and a_r == ir:
           dpsi_f = dU[a_q,:,:].dot(dpsi_f)
+
+
+#  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  -  
+  if anzatz_tp == 2:
+    for i in range(2):
+      if i == 1 and a == 0:
+        break
+
+      psi = Rq_vec(2, ang[0], 0, psi_i)
+      if a == 0:
+        psi = XYZ_vec(2, 0, psi)
       
-  return dpsi_f
+      for ctrl in range(6):
+        psi = CX_vec(ctrl, ctrl+1, psi)
+
+      psi = Rq_vec(2, 0.5*ang[1], 1, psi)
+      if a == 1 and i == 0:
+        psi = XYZ_vec(2, 1, psi)
+      psi = CX_vec(0, 1, psi)
+      psi = Rq_vec(2,-0.5*ang[1], 1, psi)
+      if a == 1 and i == 1:
+        psi = XYZ_vec(2, 1, psi)
+      psi = CX_vec(0, 1, psi)
+
+      psi = CX_vec(2, 3, psi)
+
+      psi = Rq_vec(2, 0.5*ang[2], 5, psi)
+      if a == 2 and i == 0:
+        psi = XYZ_vec(2, 5, psi)
+      psi = CX_vec(4, 5, psi)
+      psi = Rq_vec(2,-0.5*ang[2], 5, psi)
+      if a == 2 and i == 1:
+        psi = XYZ_vec(2, 5, psi)
+      psi = CX_vec(4, 5, psi)
+
+      psi = XYZ_vec(1, 3, psi)
+      
+      psi = oCX_vec(1, 2, psi)
+      psi = oCX_vec(2, 3, psi)
+      psi = oCX_vec(3, 4, psi)
+
+      psi = Rq_vec(2, 0.5*ang[3], 5, psi)
+      if a == 3 and i == 0:
+        psi = XYZ_vec(2, 5, psi)
+      psi = CX_vec(4, 5, psi)
+      psi = Rq_vec(2,-0.5*ang[3], 5, psi)
+      if a == 3 and i == 1:
+        psi = XYZ_vec(2, 5, psi)
+      psi = CX_vec(4, 5, psi)
+
+      psi = oCX_vec(3, 4, psi)
+      psi = oCX_vec(2, 3, psi)
+      
+      psi = oCX_vec(5, 6, psi)
+      
+      if i == 0:
+        dpsi_f = psi
+      else:
+        dpsi_f -= psi
+        dpsi_f *= 0.5
+
+    return -0.5*1j*dpsi_f
 # ===================================================================

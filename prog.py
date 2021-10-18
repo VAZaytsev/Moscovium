@@ -8,6 +8,8 @@ import math
 import cmath
 import scipy
 
+import time
+
 import sys
 
 from qiskit_nature.problems.second_quantization.electronic.builders.fermionic_op_builder import build_ferm_op_from_ints
@@ -426,18 +428,20 @@ for i, ne in enumerate(ne_arr):
 
 
 # Imaginary time propagation ========================================
-dtau = 0.05
+dtau = 0.5
 # In principle the value of dtau and the difference in energy between 
 # ground and excited states defines the number of necessary steps
 # for propagation in imaginary time
 
 
 # Preparation -------------------------------------------------------
+anzatz_tp = 2
+
 Nlayers = 2
-anzatz_tp = 1
+
 
 if anzatz_tp == 0:
-  rot = [2,3]
+  rot = [2]
   # in rot can be any number of rotations
   # values can be only 1,2, or 3 related to Rx, Ry, and Rz, respectively
   #
@@ -472,12 +476,15 @@ if anzatz_tp == 1:
   Nparam = Nlayers * (Nq - 1)
   Uent = None
 
+if anzatz_tp == 2:
+  rot = []
+  Uent = None
+  Nparam = 4
 
 
-#rot_ang_c = np.zeros((Nparam))
 rot_ang_c = math.pi*(2*np.random.rand(Nparam)-1)
 print("Total number of parameters in anzatz = ", Nparam, flush=True)
-#print(rot_ang)
+
 
 
 # Calculate derivative matrices for classical calculations
@@ -486,20 +493,22 @@ dU = deriv_mtrx(anzatz_tp, rot, Nq)
 
 # Exact ground-state wave function for given number of electrons
 psi_exact = wf[:,indx_g[Nelec]].copy()
-indx = np.argsort( abs(psi_exact), axis=0 )
+np.save("psi_exact", psi_exact)
 
+
+indx = np.argsort( abs(psi_exact), axis=0 )
 print("\n","Exact wave function (dominant contributions)")
 for i in range(2**Nq):
   ii = indx[2**Nq-1-i]
   bn_ii = bin(ii)[2:].zfill(Nq)
   x = psi_exact[ ii ]
 
-  if abs(x)**2 > 1.e-5:
+  if abs(x)**2 > 1.e-15:
     print( f'{i: >2}', 
           bn_ii, 
+          x,
           f'{abs(x)**2: .5f}', 
           bin_to_conf( orb_arr, bn_ii ), flush=True)
-
 
 
 # Dominant contribution comes from the Slater determinant
@@ -507,7 +516,11 @@ for i in range(2**Nq):
 psi_i_bn = bin( 
   int( np.argsort( abs(psi_exact), axis=0 )[-1] ) 
   )[2:].zfill(Nq)
+
+if anzatz_tp == 2:
+  psi_i_bn = "00110010"
 print("\n","Initial guess = ", psi_i_bn, flush=True)
+
 
 #exit()
 # Convert to the Pauli string of X and I gates 
@@ -517,6 +530,8 @@ psi_i_ps = [ psi_i_bn[i] for i in range(Nq)]
 
 # For evaluation by classical algorithms we need a vector
 psi_i_vec = ps_2_vec(psi_i_ps, Nq)
+np.save("psi_in", psi_i_vec)
+#exit()
 
 
 # Check anzatz - - - - - - - - - - - - - - - - - - - - - - - - - - - 
@@ -534,11 +549,15 @@ def dfun(vctr):
 # All layers are calculated and stored since they will be used 
 # Nparam = len(vctr) times for the evaluation of the derivative
   U = anzatz_matrices(anzatz_tp, rot, Nlayers, vctr, Nq)
+
   for a in range(Nparam):
     dpsi_f_vec = apply_danzatz(anzatz_tp, rot, Nlayers, vctr, Nq, 
-                               U, dU, a,psi_i_vec, Uent)
+                               U, dU, a, psi_i_vec, Uent)
 
     res[a] = -2 * (dpsi_f_vec.conj().T).dot( psi_exact ).item(0).real
+
+
+
   return res
 
 rot_ang_bst = scipy.optimize.minimize(fun, 
@@ -549,11 +568,15 @@ rot_ang_bst = scipy.optimize.minimize(fun,
 
 
 #print("Best rotation angles \n", 
-      #np.array([x - 2*pi*math.floor(x/(2*pi)) for x in rot_ang_bst])/pi*180 )
+      #np.array([x - 2*pi*math.floor(x/(2*pi)) for x in rot_ang_bst]) )
 #print("Best rotation angles \n", rot_ang_bst/pi, flush=True )
 
 psi_f_vec = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_bst, Nq,
                          psi_i_vec, Uent)
+#psi_f_vec = anzatz_psi(anzatz_tp, rot, Nlayers, rot_ang_bst, Nq, 
+                         #psi_i_vec, ent_mask)
+##psi_f_vec = anzatz_115_8_psi(rot_ang_bst, psi_i_vec)
+
 diff = np.linalg.norm(psi_f_vec - psi_exact)**2.0
 print( "Diff with exact wf = ", diff, flush=True )
 
@@ -570,38 +593,29 @@ E = (psi_f_vec.conj().T).dot( H_mtrx.dot(psi_f_vec) ).item().real
 print("\n","For these angles one obtains E_g = ", E, 
       "\n","diff with exact = ", f'{E - energy[indx_g[Nelec]]: .1e}',
       flush=True)
-exit()
+#exit()
 # Anzatz checked ----------------------------------------------------
 
 
 # Propagation in accordance to McArdle ==============================
 #rot_ang_c = rot_ang_bst.copy() # Cheating!!!
 
-rot_ang_c = np.array([0.5*pi]*Nparam)
+#rot_ang_c = np.array([0.5*pi]*Nparam)
 
 # One arbitrary angle is replaced with an arbitrary value
 #rot_ang_c[np.random.randint(0, Nparam)] = math.pi*(2*np.random.rand(1)-1)
 
 
 U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
-
 for it in range(100000):
   A_mtrx_c = 0.5*np.identity((Nparam),dtype=float)
   C_vec_c = np.zeros((Nparam),dtype=float)
 
-  #U = rot_matrices(Nlayers, rot_ang_c, Nq)
-  #anzatz_mtrx = anzatz_mtrx_sub(Nlayers, U, Nq)
-  #psi_c = anzatz_mtrx.dot(psi0_c).reshape((2**Nq,1))
-
   psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
                        psi_i_vec, Uent)
 
-
 # Calculate C -------------------------------------------------------
   for a in range(Nparam):
-
-    #danzatz_mtrx_a = danzatz_mtrx_sub(Nlayers, U, dU, Nq, a)
-    #dpsi_c_a = (danzatz_mtrx_a.dot(psi0_c)).reshape((2**Nq,1))
     dpsi_c_a = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
                                U, dU, a, psi_i_vec, Uent)
 
@@ -611,8 +625,8 @@ for it in range(100000):
 # Calculated A matrix -----------------------------------------------
     for b in range(a+1, Nparam):
       dpsi_c_b = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
-                               U, dU, b, psi_i_vec, Uent)
-        
+                                U, dU, b, psi_i_vec, Uent)
+
       A_mtrx_c[a,b] = 2*(dpsi_c_a.conj().T).dot( dpsi_c_b ).item(0).real
       A_mtrx_c[b,a] = A_mtrx_c[a,b]
 
@@ -626,23 +640,19 @@ for it in range(100000):
 
 # Average value of Hamiltonian and wf measurements ------------------
   U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
-  
   psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
                        psi_i_vec, Uent)
 
   E = (psi_c.conj().T).dot( H_mtrx.dot(psi_c) ).item().real
-  
-# It looks like the algorithm finds the minima, but there should 
-# be a condition for it to exit
-# It will be also nice to reduce the step (dtau), when 
-# the local minima is found, but for quantum computers this trick
-# may not work
+
+# It will be nice to reduce the step (dtau), when 
+# the local minima is found
   if it%100 == 0:
     print("<E> = ", f'{E: .5f}', 
           "|psi - psi_exct| = ", 
           f'{ np.linalg.norm(psi_c - psi_exact)**2.0: .1e}',
           np.amax(abs(dtheta_c)), flush=True)
-  if np.amax(abs(dtheta_c)) < 1.e-8:
+  if np.amax(abs(dtheta_c)) < 1.e-3:
     break
 
 

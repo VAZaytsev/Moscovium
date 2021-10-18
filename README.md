@@ -1,4 +1,8 @@
+we search for the wave function of the form
+
 ![equation](https://latex.codecogs.com/gif.latex?%5Cpsi%28%5Cvec%7B%5Ctheta%7D%29%20%3D%20U%28%5Cvec%7B%5Ctheta%7D%29%5Cpsi_0)
+
+where 
 
 ![equation](https://latex.codecogs.com/gif.latex?u_i%20%5Cequiv%20u%28%5Ctheta_i%29%20%3D%20e%5E%7B-i%5Ctheta_i%5Csigma/2%7D)
 

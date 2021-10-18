@@ -8,10 +8,6 @@ where
 
 ![equation](https://latex.codecogs.com/gif.latex?u_i%20%5Cequiv%20u%28%5Ctheta_i%29%20%3D%20e%5E%7B-i%5Ctheta_i%5Csigma/2%7D)
 
-Utilizing that the derivative with respect to the parameter expresses as
-
-![equation](https://latex.codecogs.com/gif.latex?%5Cfrac%7B%5Cpartial%20U%7D%7B%5Cpartial%20%5Ctheta_a%7D%20%3D%20-%5Cfrac%7Bi%7D%7B2%7Du_n%20%5Cdots%20u_a%20%5Csigma%5E%7B%28i_a%29%7D%20u_%7Ba-1%7D%20%5Cdots%20u_1%20%3D%20-%5Cfrac%7Bi%7D%7B2%7D%20V_a)
-
 Equation on variation of the parameters
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Csum_%7Bab%7D%20A_%7Bab%7D%20%5Cdot%7B%5Ctheta%7D_b%20%3D%20-C_a)
@@ -24,11 +20,16 @@ and
 
 ![equation](https://latex.codecogs.com/gif.latex?A_%7Bab%7D%20%3D%20%5Cleft%5Clangle%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%20%5CBig%5Cvert%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_b%7D%20%5Cright%5Crangle%20&plus;%20%5Cleft%5Clangle%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_b%7D%20%5CBig%5Cvert%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%20%5Cright%5Crangle)
 
-we decompose the Hamiltonian into a sum of Pauli strings (PS)
+Utilizing that the derivative with respect to the parameter expresses as
+
+![equation](https://latex.codecogs.com/gif.latex?%5Cfrac%7B%5Cpartial%20U%7D%7B%5Cpartial%20%5Ctheta_a%7D%20%3D%20-%5Cfrac%7Bi%7D%7B2%7Du_n%20%5Cdots%20u_a%20%5Csigma%5E%7B%28i_a%29%7D%20u_%7Ba-1%7D%20%5Cdots%20u_1%20%3D%20-%5Cfrac%7Bi%7D%7B2%7D%20V_a)
+
+and decomposing the Hamiltonian into a sum of Pauli strings (PS)
 
 ![equation](https://latex.codecogs.com/gif.latex?H%20%3D%20%5Csum_h%20%5Calpha_h%20%5CSigma_h)
 
-each PS we can write as follows
+one can evaluate all elements of the equation. 
+First, let us write PS as follows
 
 ![equation](https://latex.codecogs.com/gif.latex?%5CSigma_h%20%3D%20U_h%20D_h%20U%5E%5Cdagger_h)
 

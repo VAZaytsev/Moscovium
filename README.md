@@ -26,13 +26,13 @@ each PS we can write as follows
 
 ![equation](https://latex.codecogs.com/gif.latex?%5CSigma_h%20%3D%20U_h%20D_h%20U%5E%5Cdagger_h)
 
-where ![equation](https://latex.codecogs.com/gif.latex?D_h) is the diagonal matrix. Then the vector can be found as a result of the measurement 
-
-![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Csum_x%20%5Cleft%5Clangle%20x%20%5Cleft%5Cvert%20D_h%20%5Cright%5Cvert%20x%20%5Cright%5Crangle%20%5Cleft%28%20P_%7B0x%7D%20-%20P_%7B1x%7D%20%5Cright%20%29)
-
-of the circuit
+where ![equation](https://latex.codecogs.com/gif.latex?D_h) is the diagonal matrix. Then the vector can be found as a result of the measurement of the circuit
 
 ![alt text](pictures/c_vec_circ.png)
+
+as follows
+
+![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Csum_x%20%5Cleft%5Clangle%20x%20%5Cleft%5Cvert%20D_h%20%5Cright%5Cvert%20x%20%5Cright%5Crangle%20%5Cleft%28%20P_%7B0x%7D%20-%20P_%7B1x%7D%20%5Cright%20%29)
 
 # Notes
 

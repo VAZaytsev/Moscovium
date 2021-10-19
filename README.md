@@ -8,13 +8,20 @@ where ![equation](https://latex.codecogs.com/gif.latex?%5CPsi_0) stands for the 
 
 ![equation](https://latex.codecogs.com/gif.latex?U%28%5Cvec%7B%5Ctheta%7D%29%20%3D%20u_N%20%5Cdots%20u_1)
 
+In the simplest case, ![equation](https://latex.codecogs.com/gif.latex?u_i) designates the one qubit rotation and expresses as
+
 ![equation](https://latex.codecogs.com/gif.latex?u_i%20%5Cequiv%20u%28%5Ctheta_i%29%20%3D%20e%5E%7B-i%5Ctheta_i%5Csigma/2%7D)
 
-Equation on variation of the parameters
+In order to find the parameters ![equation](https://latex.codecogs.com/gif.latex?%5Cvec%7B%5Ctheta%7D) one can use the imaginary time evolution (ITE) method.
+Within this approach the application of the ![equation](https://latex.codecogs.com/gif.latex?e%5E%7B-%5Ctau%20H%7D) to the wave function ![equation](https://latex.codecogs.com/gif.latex?%5CPsi%28%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%29) is equivalent to the following change of the parameters 
+
+![equation](https://latex.codecogs.com/gif.latex?%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%20%5Crightarrow%20%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20new%7D%20%3D%20%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%20&plus;%20%5Ctau%20%5Cdot%7B%5Cvec%7B%5Ctheta%7D%7D)
+
+where ![equation](https://latex.codecogs.com/gif.latex?%5Cdot%7B%5Cvec%7B%5Ctheta%7D%7D) is found from the equation
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Csum_%7Bab%7D%20A_%7Bab%7D%20%5Cdot%7B%5Ctheta%7D_b%20%3D%20-C_a)
 
-with
+Here
 
 ![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Cleft%5Clangle%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%5Cleft%5Cvert%20H%5Cright%5Cvert%20%5Cpsi%20%5Cright%5Crangle%20&plus;%20%5Cleft%5Clangle%20%5Cpsi%20%5Cleft%5Cvert%20H%5Cright%5Cvert%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%20%5Cright%5Crangle)
 

@@ -60,11 +60,13 @@ where the probabilities are obtained from measuring the circuit
 
 ![alt text](pictures/a2_mtrx_circ.png)
 
-Note that in this circuit there are two ancilla qubits that differ from one ancilla qubit variant presented in the paper by McArdle with co-authors. 
-The use of two ancilla qubits instead of one allows one to sufficiently relax the requirements on the connectivity of the qubits in the quantum processor.  
-In the case when both derivatives act on the parameters corresponding to the same qubit, one needs to utilize the original scheme. 
+Note that in this circuit there are two ancilla qubits that differ from one ancilla qubit variant presented in the paper by McArdle with co-authors. The use of two ancilla qubits instead of one allows one to sufficiently relax the requirements on the connectivity of the qubits in the quantum processor. In the case when both derivatives act on the parameters corresponding to the same qubit, one needs to utilize the original scheme. 
 
 ![alt text](pictures/a_mtrx_circ.png)
+
+The matrix elements are given by
+
+![equation](https://latex.codecogs.com/gif.latex?A_%7Bab%7D%20%3D%20P_0%20-%20%5Cfrac%7B1%7D%7B2%7D%20%3D%20%5Cfrac%7B1%7D%7B2%7D%20-%20P_1)
 
 # Notes
 

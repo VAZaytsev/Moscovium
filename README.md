@@ -62,6 +62,9 @@ where the probabilities are obtained from measuring the circuit
 
 Note that in this circuit there are two ancilla qubits that differ from one ancilla qubit variant presented in the paper by McArdle with co-authors. 
 The use of two ancilla qubits instead of one allows one to sufficiently relax the requirements on the connectivity of the qubits in the quantum processor.  
+In the case when both derivatives act on the parameters corresponding to the same qubit, one needs to utilize the original scheme. 
+
+![alt text](pictures/a_mtrx_circ.png)
 
 # Notes
 

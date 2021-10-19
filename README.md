@@ -43,21 +43,9 @@ Utilizing this expression and the decomposition of the Hamiltonian into PS, one 
 
 ![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Csum_h%20%5Calpha_h%20%5Csum_x%20%5Cleft%5Clangle%20x%20%5Cleft%5Cvert%20D_h%20%5Cright%5Cvert%20x%20%5Cright%5Crangle%20%5Cleft%28P_%7B0x%7D%20-%20P_%7B1x%7D%20%5Cright%20%29)
 
-where ![equation](https://latex.codecogs.com/gif.latex?D_h) is the diagonal matrix 
-
-![equation](https://latex.codecogs.com/gif.latex?%5CSigma_h%20%3D%20U_h%20D_h%20U%5E%5Cdagger_h)
-
-probabilities ![equation](https://latex.codecogs.com/gif.latex?P_%7Bix%7D) are obtained as a result of measurement of the following circuit
+where ![equation](https://latex.codecogs.com/gif.latex?D_h%20%3D%20U%5E%5Cdagger_h%20%5CSigma_h%20U_h) is the diagonal matrix and probabilities ![equation](https://latex.codecogs.com/gif.latex?P_%7Bix%7D) are obtained as a result of measurement of the following circuit
 
 ![alt text](pictures/c_vec_circ.png)
-
-
-
-where . Then the vector can be found as a result of the measurement of the circuit
-
-
-
-
 
 # Notes
 

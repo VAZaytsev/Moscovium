@@ -53,7 +53,7 @@ Similarly, one can show that
 
 ![equation](https://latex.codecogs.com/gif.latex?A_%7Bab%7D%20%3D%20P_%7B00%7D%20&plus;%20P_%7B11%7D%20-%20%5Cfrac%7B1%7D%7B2%7D%20%3D%20%5Cfrac%7B1%7D%7B2%7D%20-%20P_%7B01%7D%20-%20P_%7B10%7D)
 
-where the probabilities ![equation]() are obtained from measuring the circuit
+where the probabilities ![equation](https://latex.codecogs.com/gif.latex?P_%7Bij%7D) are obtained from measuring the circuit
 
 ![alt text](pictures/a2_mtrx_circ.png)
 

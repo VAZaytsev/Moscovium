@@ -1,8 +1,10 @@
-we search for the wave function of the form
+# Theoretical Background
 
-![equation](https://latex.codecogs.com/gif.latex?%5Cpsi%28%5Cvec%7B%5Ctheta%7D%29%20%3D%20U%28%5Cvec%7B%5Ctheta%7D%29%5Cpsi_0)
+We search for the wave function of the ground state  in the form
 
-where 
+![equation](https://latex.codecogs.com/gif.latex?%5CPsi%28%5Cvec%7B%5Ctheta%7D%29%20%3D%20U%28%5Cvec%7B%5Ctheta%7D%29%5CPsi_0)
+
+where ![equation](https://latex.codecogs.com/gif.latex?%5CPsi_0) stands for the initial guess of the wave function and
 
 ![equation](https://latex.codecogs.com/gif.latex?U%28%5Cvec%7B%5Ctheta%7D%29%20%3D%20u_N%20%5Cdots%20u_1)
 

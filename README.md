@@ -47,7 +47,7 @@ where ![equation](https://latex.codecogs.com/gif.latex?D_h%20%3D%20U%5E%5Cdagger
 
 ![alt text](pictures/c_vec_circ.png)
 
-**Note:** not all ![equation](https://latex.codecogs.com/gif.latex?%5Cdpi%7B300%7D%20%5CSigma_h) have to be measured. The results for the Pauli strings differing by the replacement of Z Pauli matrices with identity matrices can be obtained from the single measurement.
+**Note:** not all ![equation](https://latex.codecogs.com/gif.latex?%5CSigma_h) have to be measured. The results for the Pauli strings differing by the replacement of Z Pauli matrices with identity matrices can be obtained from the single measurement.
 
 # Notes
 

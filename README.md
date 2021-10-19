@@ -13,7 +13,7 @@ In the simplest case, ![equation](https://latex.codecogs.com/gif.latex?u_i) desi
 ![equation](https://latex.codecogs.com/gif.latex?u_i%20%5Cequiv%20u%28%5Ctheta_i%29%20%3D%20e%5E%7B-i%5Ctheta_i%5Csigma/2%7D)
 
 In order to find the parameters ![equation](https://latex.codecogs.com/gif.latex?%5Cvec%7B%5Ctheta%7D) one can use the imaginary time evolution (ITE) method.
-Within this approach the application of the ![equation](https://latex.codecogs.com/gif.latex?e%5E%7B-%5Ctau%20H%7D) to the wave function ![equation](https://latex.codecogs.com/gif.latex?%5CPsi%28%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%29) is equivalent to the following change of the parameters 
+Within this approach, the application of the ![equation](https://latex.codecogs.com/gif.latex?e%5E%7B-%5Ctau%20H%7D) to the wave function ![equation](https://latex.codecogs.com/gif.latex?%5CPsi%28%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%29) is equivalent to the following change of the parameters 
 
 ![equation](https://latex.codecogs.com/gif.latex?%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%20%5Crightarrow%20%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20new%7D%20%3D%20%5Cvec%7B%5Ctheta%7D_%7B%5Crm%20old%7D%20&plus;%20%5Ctau%20%5Cdot%7B%5Cvec%7B%5Ctheta%7D%7D)
 
@@ -24,16 +24,20 @@ where ![equation](https://latex.codecogs.com/gif.latex?%5Cdot%7B%5Cvec%7B%5Cthet
 Here
 
 ![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Cleft%5Clangle%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%5Cleft%5Cvert%20H%5Cright%5Cvert%20%5Cpsi%20%5Cright%5Crangle%20&plus;%20%5Cleft%5Clangle%20%5Cpsi%20%5Cleft%5Cvert%20H%5Cright%5Cvert%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%20%5Cright%5Crangle)
+
 and
+
 ![equation](https://latex.codecogs.com/gif.latex?A_%7Bab%7D%20%3D%20%5Cleft%5Clangle%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%20%5CBig%5Cvert%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_b%7D%20%5Cright%5Crangle%20&plus;%20%5Cleft%5Clangle%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_b%7D%20%5CBig%5Cvert%20%5Cfrac%7B%5Cpartial%5Cpsi%7D%7B%5Cpartial%5Ctheta_a%7D%20%5Cright%5Crangle)
 
-Utilizing that the derivative with respect to the parameter expresses as
-
-![equation](https://latex.codecogs.com/gif.latex?%5Cfrac%7B%5Cpartial%20U%7D%7B%5Cpartial%20%5Ctheta_a%7D%20%3D%20-%5Cfrac%7Bi%7D%7B2%7Du_n%20%5Cdots%20u_a%20%5Csigma%5E%7B%28i_a%29%7D%20u_%7Ba-1%7D%20%5Cdots%20u_1%20%3D%20-%5Cfrac%7Bi%7D%7B2%7D%20V_a)
-
-and decomposing the Hamiltonian into a sum of Pauli strings (PS)
+The coefficients ![equation](https://latex.codecogs.com/gif.latex?A_%7Bab%7D) and ![equation](https://latex.codecogs.com/gif.latex?C_a) can be evaluated with the use of a quantum computer as follows.
+First, let us decompose the Hamiltonian into a sum of Pauli strings (PS)
 
 ![equation](https://latex.codecogs.com/gif.latex?H%20%3D%20%5Csum_h%20%5Calpha_h%20%5CSigma_h)
+
+As a next step, one needs to evaluate the derivative with respect to the parameter ![equation](https://latex.codecogs.com/gif.latex?%5Ctheta_a).
+In the simplest case, when ![equation](https://latex.codecogs.com/gif.latex?u_i) stands for the one qubit rotations, one obtains
+
+![equation](https://latex.codecogs.com/gif.latex?%5Cfrac%7B%5Cpartial%20U%7D%7B%5Cpartial%20%5Ctheta_a%7D%20%3D%20-%5Cfrac%7Bi%7D%7B2%7Du_n%20%5Cdots%20u_a%20%5Csigma%5E%7B%28i_a%29%7D%20u_%7Ba-1%7D%20%5Cdots%20u_1%20%3D%20-%5Cfrac%7Bi%7D%7B2%7D%20V_a)
 
 one can evaluate all elements of the equation. 
 First, let us write PS as follows

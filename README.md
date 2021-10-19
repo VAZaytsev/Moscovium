@@ -41,7 +41,7 @@ In the simplest case, when ![equation](https://latex.codecogs.com/gif.latex?u_i)
 
 Utilizing this expression and the decomposition of the Hamiltonian into PS, one can show that
 
-![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Csum_h%20%5Calpha_h%20%5Csum_x%20%5Cleft%5Clangle%20x%20%5Cleft%5Cvert%20D_h%20%5Cright%5Cvert%20x%20%5Cright%5Crangle%20%5Cleft%28P_%7B0x%7D%20-%20P_%7B1x%7D%20%5Cright%20%29)
+![equation](https://latex.codecogs.com/gif.latex?C_a%20%3D%20%5Csum_h%20%5Calpha_h%20%5Csum_x%20%5Cleft%5Clangle%20x%20%5Cleft%5Cvert%20D_h%20%5Cright%5Cvert%20x%20%5Cright%5Crangle%20%5Cleft%28%20P_%7B1x%7D%20-%20P_%7B0x%7D%5Cright%20%29)
 
 where ![equation](https://latex.codecogs.com/gif.latex?D_h%20%3D%20U%5E%5Cdagger_h%20%5CSigma_h%20U_h) is the diagonal matrix and probabilities ![equation](https://latex.codecogs.com/gif.latex?P_%7Bix%7D) are obtained as a result of measurement of the following circuit
 

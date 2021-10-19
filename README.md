@@ -49,6 +49,17 @@ where ![equation](https://latex.codecogs.com/gif.latex?D_h%20%3D%20U%5E%5Cdagger
 
 **Note:** not all ![equation](https://latex.codecogs.com/gif.latex?%5CSigma_h) have to be measured. The results for the Pauli strings differing by the replacement of Z Pauli matrices with identity matrices can be obtained from the single measurement.
 
+Similarly, one can show that 
+
+![equation](https://latex.codecogs.com/gif.latex?A_%7Bab%7D%20%3D%20P_%7B00%7D%20&plus;%20P_%7B11%7D%20-%20%5Cfrac%7B1%7D%7B2%7D%20%3D%20%5Cfrac%7B1%7D%7B2%7D%20-%20P_%7B01%7D%20-%20P_%7B10%7D)
+
+where the probabilities ![equation]() are obtained from measuring the circuit
+
+![alt text](pictures/a2_mtrx_circ.png)
+
+Note that in this circuit there are two ancilla qubits that differs from one ancilla qubit variant presented in the paper by McArdle with co-authors. 
+The use of two ancilla qubits instead of one allows one to sufficiently relax the requirements on the connectivity of the qubits in the quantum processor.  
+
 # Notes
 
 To launch the code type:

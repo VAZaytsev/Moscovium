@@ -47,6 +47,9 @@ where ![equation](https://latex.codecogs.com/gif.latex?D_h%20%3D%20U%5E%5Cdagger
 
 ![alt text](pictures/c_vec_circ.png)
 
+This circuit differ from one presented in the paper by McArdle with co-authors by the absence of one controlled operation. 
+Instead, one needs to perform additional postprocessing, namely, evaluate the average of the diagonal matrix, i.e. only calculate the sign of the contribution.
+
 **Note:** not all ![equation](https://latex.codecogs.com/gif.latex?%5CSigma_h) have to be measured. The results for the Pauli strings differing by the replacement of Z Pauli matrices with identity matrices can be obtained from the single measurement.
 
 Similarly, one can show that 
@@ -57,7 +60,7 @@ where the probabilities are obtained from measuring the circuit
 
 ![alt text](pictures/a2_mtrx_circ.png)
 
-Note that in this circuit there are two ancilla qubits that differs from one ancilla qubit variant presented in the paper by McArdle with co-authors. 
+Note that in this circuit there are two ancilla qubits that differ from one ancilla qubit variant presented in the paper by McArdle with co-authors. 
 The use of two ancilla qubits instead of one allows one to sufficiently relax the requirements on the connectivity of the qubits in the quantum processor.  
 
 # Notes

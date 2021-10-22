@@ -1,0 +1,10 @@
+OBI = z115_1-int.txt
+TBI = z115_2-int.txt
+Nelec = 5
+norb = 8
+anzatz_tp = 2
+Nlayers = 1
+rot = [2,3]
+Q_on = True
+noise_off = True
+Nrep = 10

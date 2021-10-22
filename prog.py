@@ -1,6 +1,8 @@
 import os
 os.environ["OMP_NUM_THREADS"] = "8" # export OMP_NUM_THREADS=4
 
+
+ 
 import numpy as np
 from numpy import pi
 
@@ -24,8 +26,10 @@ from ps_mod import *
 from anzatz import *
 from routines import *
 
+from quantum_mod import *
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-Nelec = 5
+#Nelec = 2
 
 name2l = {
   "s": 0,
@@ -86,9 +90,47 @@ def find_orb(arr, indx, m):
 
 
 # Read files --------------------------------------------------------
-fl_1b_int = open(sys.argv[1],"r")
-fl_2b_int = open(sys.argv[2],"r")
-norb_max = int(sys.argv[3])
+#fl_1b_int = open(sys.argv[1],"r")
+#fl_2b_int = open(sys.argv[2],"r")
+#norb_max = int(sys.argv[3])
+fl_inp = open(sys.argv[1],"r")
+
+for ln in fl_inp.readlines():
+  if ln == "\n":
+    continue
+
+  key, val = ln.strip().replace(" ","").split("=")
+  if key == "OBI":
+    fl_1b_int = open(val,"r")
+
+  if key == "TBI":
+    fl_2b_int = open(val,"r")
+
+  if key == "Nelec":
+    Nelec = int(val)
+
+  if key == "norb":
+    norb_max = int(val)
+
+  if key == "anzatz_tp":
+    anzatz_tp = int(val)
+
+  if key == "Nlayers":
+    Nlayers = int(val)
+
+  if key == "rot":
+    rot = [int(x) for x in val.replace("[","").replace("]","").split(",")]
+
+  if key == "Q_on":
+    Q_on = (val == "True")
+
+  if key == "noise_off":
+    noise_off = (val == "True")
+
+  if key == "Nrep":
+    Nrep = int(val)
+
+#exit()
 
 
 # reading one-electron orbitals - - - - - - - - - - - - - - - - - - -
@@ -247,8 +289,12 @@ qubit_converter = QubitConverter(mapper=JordanWignerMapper())
 
 H_op = 0*FermionicOp("I"*norb).reduce()
 
-#N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(norb))
-#H_op += 10*(N_part_op - Nelec*FermionicOp("I"*norb))**2
+
+# This term will add some energy to the states with wrong particle number
+if anzatz_tp == 0:
+  N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(norb))
+  H_op += 10*(N_part_op - Nelec*FermionicOp("I"*norb))**2
+
 
 #Add one-body integrals
 for p in range(norb):
@@ -428,6 +474,20 @@ for i, ne in enumerate(ne_arr):
 
 
 # Imaginary time propagation ========================================
+#Q_on = True
+#noise_off = True
+create_noise_model(Nq, Nrep)
+
+
+# Not all Pauli matrices have to be measured - - - - - - - - - - - - 
+if Q_on:
+  ps_meas, indx_ps2meas = extract_ps_for_measurement(H_q)
+  print("Hamiltonian consists of",len(indx_ps2meas),"PS", flush=True )
+  print("It is sufficient to measure", len(ps_meas), "of them", flush=True)
+#exit()
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
 dtau = 0.5
 # In principle the value of dtau and the difference in energy between 
 # ground and excited states defines the number of necessary steps
@@ -435,10 +495,12 @@ dtau = 0.5
 
 
 # Preparation -------------------------------------------------------
-anzatz_tp = 2
+#anzatz_tp = 0
+#Nlayers = 1
+#rot = []
 
-Nlayers = 2
-
+Uent = None
+Uent_circ = None
 
 if anzatz_tp == 0:
   rot = [2]
@@ -453,13 +515,15 @@ if anzatz_tp == 0:
   #                                            |
   # --- rot[1](ang_3) --- rot[2](ang_7) -------x---
   #
-  # + final layer of rotations 
+  # + final layer of rotations
   Nparam = (Nlayers + 1) * Nq * len(rot)
   Uent = entangling_mtrx(Nq)
+  if Q_on:
+    Uent_circ = entangling_circ(Nq)
+    print(Uent_circ)
 
 
 if anzatz_tp == 1:
-  rot = []
   # ---.-------
   #    |
   #   [R](ang_0)
@@ -474,15 +538,13 @@ if anzatz_tp == 1:
   #    |
   # ---.-------
   Nparam = Nlayers * (Nq - 1)
-  Uent = None
 
 if anzatz_tp == 2:
-  rot = []
-  Uent = None
   Nparam = 4
 
 
 rot_ang_c = math.pi*(2*np.random.rand(Nparam)-1)
+rot_ang_q = rot_ang_c.copy()
 print("Total number of parameters in anzatz = ", Nparam, flush=True)
 
 
@@ -527,6 +589,11 @@ print("\n","Initial guess = ", psi_i_bn, flush=True)
 # for preparation as a quantum circuit
 psi_i_ps = [ psi_i_bn[i] for i in range(Nq)]
 
+if Q_on:
+  psi_i_circ = ps_2_circ(psi_i_ps)
+  print(psi_i_circ)
+
+  
 
 # For evaluation by classical algorithms we need a vector
 psi_i_vec = ps_2_vec(psi_i_ps, Nq)
@@ -573,9 +640,6 @@ rot_ang_bst = scipy.optimize.minimize(fun,
 
 psi_f_vec = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_bst, Nq,
                          psi_i_vec, Uent)
-#psi_f_vec = anzatz_psi(anzatz_tp, rot, Nlayers, rot_ang_bst, Nq, 
-                         #psi_i_vec, ent_mask)
-##psi_f_vec = anzatz_115_8_psi(rot_ang_bst, psi_i_vec)
 
 diff = np.linalg.norm(psi_f_vec - psi_exact)**2.0
 print( "Diff with exact wf = ", diff, flush=True )
@@ -597,19 +661,30 @@ print("\n","For these angles one obtains E_g = ", E,
 # Anzatz checked ----------------------------------------------------
 
 
+
+
+# VQE ===============================================================
+VQE_on = True
+if VQE_on:
+  E_q = measure_Ham(anzatz_tp, psi_i_circ, Uent_circ,
+                    Nlayers, rot, rot_ang_bst, 
+                    ps_meas, indx_ps2meas, H_q, 
+                    noise_off=noise_off)
+  print("E_VQE = ", E_q)
+# ===================================================================
+
+
+
+
 # Propagation in accordance to McArdle ==============================
-#rot_ang_c = rot_ang_bst.copy() # Cheating!!!
-
-#rot_ang_c = np.array([0.5*pi]*Nparam)
-
-# One arbitrary angle is replaced with an arbitrary value
-#rot_ang_c[np.random.randint(0, Nparam)] = math.pi*(2*np.random.rand(1)-1)
-
-
 U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
 for it in range(100000):
-  A_mtrx_c = 0.5*np.identity((Nparam),dtype=float)
+  A_mtrx_c = np.zeros((Nparam,Nparam),dtype=float)
   C_vec_c = np.zeros((Nparam),dtype=float)
+
+  if Q_on:
+    A_mtrx_q = np.zeros((Nparam,Nparam),dtype=float)
+    C_vec_q = np.zeros((Nparam),dtype=float)
 
   psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
                        psi_i_vec, Uent)
@@ -622,21 +697,34 @@ for it in range(100000):
     C_vec_c[a] = -2 * (dpsi_c_a.conj().T).dot( H_mtrx.dot(psi_c) ).item(0).real
 
 
+    if Q_on:
+      C_vec_q[a] = -clc_c_vec(anzatz_tp, psi_i_circ, Uent_circ, 
+                             Nlayers, rot, rot_ang_q, a,
+                             ps_meas, indx_ps2meas, H_q,
+                             noise_off=noise_off)
+      #print("C_vec_q[a] = ", C_vec_q[a])
+
+      
 # Calculated A matrix -----------------------------------------------
-    for b in range(a+1, Nparam):
+    for b in range(a, Nparam):
       dpsi_c_b = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
                                 U, dU, b, psi_i_vec, Uent)
 
       A_mtrx_c[a,b] = 2*(dpsi_c_a.conj().T).dot( dpsi_c_b ).item(0).real
       A_mtrx_c[b,a] = A_mtrx_c[a,b]
 
+      if Q_on:
+        A_mtrx_q[a,b] = clc_a_mtrx(anzatz_tp, psi_i_circ, Uent_circ,
+                                   Nlayers, rot, rot_ang_q, a, b,
+                                   noise_off=noise_off)
+        A_mtrx_q[b,a] = A_mtrx_q[a,b]
+
 
 # Calculate new values of angles ------------------------------------
   dtheta_c = solve_Ax_b(A_mtrx_c, C_vec_c)
   rot_ang_c += dtau * dtheta_c
   
-  #print( [(ang - math.floor(0.5*ang/pi))/pi for ang in rot_ang_c] )
-  #print(dtheta_c)
+
 
 # Average value of Hamiltonian and wf measurements ------------------
   U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
@@ -644,6 +732,7 @@ for it in range(100000):
                        psi_i_vec, Uent)
 
   E = (psi_c.conj().T).dot( H_mtrx.dot(psi_c) ).item().real
+
 
 # It will be nice to reduce the step (dtau), when 
 # the local minima is found
@@ -658,6 +747,7 @@ for it in range(100000):
 
 print("Best rotation angles \n", rot_ang_bst/pi, flush=True )
 print("Angles from imaginary time\n", rot_ang_c/pi%2, flush=True )
+
 
 # On output we have
 print( "\n", " "*Nq, f'{"exact": >7}', f'{"approx": >8}', flush=True )

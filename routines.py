@@ -10,6 +10,52 @@ kp_to_name = {
 
 
 # ===================================================================
+def bin_to_vec(bn):
+  wf_bn = 1
+
+  for b in bn:
+    if b == "0":
+      wf_bn = np.kron( wf_bn, np.array([1,0]) )
+    else:
+      wf_bn = np.kron( wf_bn, np.array([0,1]) )
+
+  return wf_bn
+# ===================================================================
+
+
+# ===================================================================
+def get_Nsteps_for_exp_tauH(psi, H_mtrx, exp_tau_H):
+  psi_in = psi.copy()
+  Niter_max = 10000
+
+  converged = False
+  E_old = (psi.conj().T).dot( H_mtrx.dot(psi) ).item().real
+
+  for it in range(Niter_max):
+    psi_in = exp_tau_H.dot(psi_in)
+    psi_in /= np.linalg.norm(psi_in)
+
+
+    E_new = (psi_in.conj().T).dot( H_mtrx.dot(psi_in) ).item().real
+
+    if abs(E_new - E_old) < 1.e-6:
+      converged = True
+      return it, converged, E_new
+
+    E_old = E_new
+
+  return Niter_max, converged, E_new
+# ===================================================================
+
+
+# ===================================================================
+def average_value_for_bn_mtrx(bn, mtrx):
+  wf_bn = bin_to_vec(bn)
+  return np.conj( wf_bn.T ).dot( mtrx.dot( wf_bn )).item(0)
+# ===================================================================
+
+
+# ===================================================================
 def get_jz( orb_arr, bn ):
   jz = 0
   for i,x in enumerate(bn):

@@ -72,14 +72,42 @@ The matrix elements are given by
 
 To launch the code type:
 ```shell
-python prog.py z115_1-int.txt z115_2-int.txt 8
+python prog.py file.inp
 ```
-Here files z115_1-int.txt and z115_2-int.txt stores one- and two-body integrals in the specific format and number 8 stands for the number of spin-orbitals to be used.
 
-The curent launching format will be changed soon and all necessary data: number of electrons, names of the files with one- and two-body integrals, number of orbitals, type of the anzatz, and etc. will be stored in a separate file.
+The structure of the ```file.inp``` is following
+
+```
+OBI = z115_1-int.txt
+TBI = z115_2-int.txt
+Nelec = 5
+Parity = 1
+norb = 8
+ansatz_tp = 0
+Nlayers = 3
+rot = [2]
+Q_on = False
+noise_off = True
+Nrep = 1
+```
+
+Note that the parity should be fixed in advance. Only the ```ansatz_tp=0``` is currently available. The keys ```Q_on```, ```noise_off```, and ```Nrep``` are currently unavailable.
+
 
 # References 
 
 S. McArdle, T. Jones, S. Endo, Y. Li, S.C. Benjamin, and Xiao Yuan,
-``Variational ansatz-based quantum simulation of imaginary time evolution'',
+''Variational ansatz-based quantum simulation of imaginary time evolution'',
 [npj Quantum Inf. 5, 75 (2019)](https://www.nature.com/articles/s41534-019-0187-2)
+
+J. Stokes, J. Izaac, N. Killoran, and G. Carleo,
+''Quantum Natural Gradient'',
+[Quantum 4, 269 (2020)](https://quantum-journal.org/papers/q-2020-05-25-269/)
+
+D. Wierichs, C. Gogolin, and M. Kastoryano,
+''Avoiding local minima in variational quantum eigensolvers with the natural gradient optimizer'',
+[Phys. Rev. Res. 2, 043246 (2020)](https://journals.aps.org/prresearch/abstract/10.1103/PhysRevResearch.2.043246)
+
+D.P. Kingma and J. Ba,
+''Adam: A Method for Stochastic Optimization'',
+[arXiv:1412.6980](https://arxiv.org/abs/1412.6980)

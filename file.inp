@@ -1,10 +1,11 @@
 OBI = z115_1-int.txt
 TBI = z115_2-int.txt
 Nelec = 5
+Parity = 1
 norb = 8
-anzatz_tp = 2
-Nlayers = 1
-rot = [2,3]
-Q_on = True
+ansatz_tp = 0
+Nlayers = 3
+rot = [2]
+Q_on = False
 noise_off = True
-Nrep = 10
+Nrep = 1

@@ -10,26 +10,43 @@ import math
 import cmath
 import scipy
 
+import sympy
+
 import time
 
 import sys
 
 from qiskit_nature.problems.second_quantization.electronic.builders.fermionic_op_builder import build_ferm_op_from_ints
 from qiskit_nature.converters.second_quantization import QubitConverter
-from qiskit_nature.mappers.second_quantization import JordanWignerMapper
+from qiskit_nature.mappers.second_quantization import JordanWignerMapper, ParityMapper
 
 from qiskit_nature.operators.second_quantization import FermionicOp
 
 from find_a import *
 from second_q_op_vaz import *
 from ps_mod import *
-from anzatz import *
+from ansatz import *
 from routines import *
+
+import tappering
+import optimizers
 
 from quantum_mod import *
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#Nelec = 2
+# a- = q+ = 0.5(X + iY)
+# a+ = q- = 0.5(X - iY)
+#
+# N = a+a- = q-q+ = 0.5*(I - Z)
+#
+# NII = mtrx(I) (x) mtrx(I) (x) mtrx(N)
+# I+ = mtrx(+) (x) mtrx(Z)
+
+# q3 q2 q1 q0 - numeration of qubits
+# o3 o2 o1 o0 - numeration of orbitals
+# f0 f1 f2 f3 - numeration of fermionic operators
+#
+# a+_1 = I+II = mtrx(I) (x) mtrx(I) (x) mtrx(a+) (x) mtrx(Z)
 
 name2l = {
   "s": 0,
@@ -57,7 +74,7 @@ class rad_orb:
     return self.k == other.k and self.n == other.n
   
   def __str__(self):
-    return str(self.i) + " " + str(self.n) + " " + str(self.k)
+    return str(self.n) + " " + str(self.k)
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -76,7 +93,7 @@ class orb_cls:
     return self.k == other.k and self.n == other.n and self.m == other.m
 
   def __str__(self):
-    return str(self.i) + " " + str(self.n) + " " + str(self.k) + " " + str(self.m)
+    return str(self.n) + " " + str(self.k) + " " + str(self.m)
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -85,7 +102,12 @@ def find_orb(arr, indx, m):
     if indx == x.i and m == x.m:
       return i
   return -1  
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+def yellow_highlighting(word):
+  return '\033[30;103m' + word + '\033[0m'
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
@@ -112,8 +134,8 @@ for ln in fl_inp.readlines():
   if key == "norb":
     norb_max = int(val)
 
-  if key == "anzatz_tp":
-    anzatz_tp = int(val)
+  if key == "ansatz_tp":
+    ansatz_tp = int(val)
 
   if key == "Nlayers":
     Nlayers = int(val)
@@ -129,6 +151,9 @@ for ln in fl_inp.readlines():
 
   if key == "Nrep":
     Nrep = int(val)
+
+  if key == "Parity":
+    Parity_tot = int(val)
 
 #exit()
 
@@ -164,6 +189,8 @@ for ln in fl_1b_int.readlines():
 # creating spin-orbitals - - - - - - - - - - - - - - - - - - - - - - 
 orb_arr = []
 
+# There can be not enough space for all orbitals
+# some orbitals are deleted
 norb = 0
 delete_from = -1
 for i,x in enumerate(rad_orb_arr):
@@ -179,28 +206,32 @@ for i in range(sz):
     continue
   rad_orb_arr.pop(delete_from)
   
+# sort orbitals with respect to parity
+rad_orb_arr = sorted( rad_orb_arr, key = lambda x: (-1)**x.l, reverse=False )
 
-#print("norb = ", norb)
-# find maximal j
-jmax = max([x.j for x in rad_orb_arr])
 
-for s in range(-1,2,2):
-  for m in range( 1, int(2*jmax+1)+1, 2 ):
-    for x in rad_orb_arr:
-      if 0.5*m > x.j:
-        continue
+for x in rad_orb_arr:
+  for m in range( 1, int(2*x.j+1)+1, 2 ):
+    for s in range(-1,2,2):
       orb_arr.append( orb_cls(x.n, x.k, 0.5*m*s) )
       orb_arr[-1].i = x.i
 
-print("\nFollowing orbitals are used")
-for x in orb_arr:
-  print(x)
 
+print("\nFollowing orbitals are used")
+iq_even_first = -1
+print("Odd")
+for i,x in enumerate(orb_arr):
+  if x.l%2 == 0 and iq_even_first == -1:
+    iq_even_first = i
+    print("Even")
+    
+  print("q"+str(i), x, x.l)
+print()
 
 one_b_int = np.zeros([norb,norb])
 two_b_int = np.zeros([norb,norb,norb,norb])
 
-
+#exit()
 fl_1b_int.seek(0)
 # end creating spin-orbitals - - - - - - - - - - - - - - - - - - - - 
 
@@ -228,7 +259,8 @@ for ln in fl_1b_int.readlines():
           one_b_int[jorb,iorb] = h_ij
 # End reading one-body integrals - - - - - - - - - - - - - - - - - - 
 
-# Read one-body integrals - - - - - - - - - - - - - - - - - - - - - -
+
+# Read two-body integrals - - - - - - - - - - - - - - - - - - - - - -
 read_int = False
 for ln in fl_2b_int.readlines():
   if ln == "\n":
@@ -284,16 +316,40 @@ for ln in fl_2b_int.readlines():
 # ===================================================================
 
 
-# Construct the Hamiltonian as a fermion operator -------------------
-qubit_converter = QubitConverter(mapper=JordanWignerMapper())
+# Number of particles -----------------------------------------------
+N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(norb))
+# -------------------------------------------------------------------
+
+
+# Jz ----------------------------------------------------------------
+tmp = np.identity(norb)
+for i,orb in enumerate(orb_arr):
+  tmp[i,i] = orb.m
+
+Jz_op = build_ferm_op_from_ints(one_body_integrals=tmp)
+# -------------------------------------------------------------------
+
+
+# Parity ------------------------------------------------------------
+tmp = np.identity(norb)
+for i,orb in enumerate(orb_arr):
+  tmp[i,i] = orb.l
+
+Parity_op = build_ferm_op_from_ints(one_body_integrals=tmp)
+# -------------------------------------------------------------------
+
+
+# Hamiltonian -------------------------------------------------------
+#qubit_converter = QubitConverter(mapper=JordanWignerMapper())
+qubit_converter = QubitConverter(mapper=ParityMapper())
 
 H_op = 0*FermionicOp("I"*norb).reduce()
 
 
 # This term will add some energy to the states with wrong particle number
-if anzatz_tp == 0:
-  N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(norb))
-  H_op += 10*(N_part_op - Nelec*FermionicOp("I"*norb))**2
+#if anzatz_tp == 0:
+  #N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(norb))
+  #H_op += 10*(N_part_op - Nelec*FermionicOp("I"*norb))**2
 
 
 #Add one-body integrals
@@ -328,35 +384,63 @@ H_op = H_op.reduce()
 
 # Rewrite Hamiltonian as a sum of Pauli strings ---------------------
 H_q = qubit_converter.convert(H_op)
+#for h in H_q.primitive.to_list():
+  #print(h)
+Parity_q = qubit_converter.convert(Parity_op)
+N_part_q = qubit_converter.convert(N_part_op)
+Jz_q = qubit_converter.convert(Jz_op)
+
+
 
 Nq = H_q.num_qubits
-print( "Nq = ", Nq, flush=True )
+print( "Nq before tappering = ", Nq, flush=True )
 
 
-# Number of particles -----------------------------------------------
-N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(Nq))
-N_part_q = qubit_converter.convert(N_part_op)
-N_part_mtrx = N_part_q.to_matrix().real
-# -------------------------------------------------------------------
+
+# Tappering qubits --------------------------------------------------
+Tappering_on = True
+if Tappering_on:
+  # tapper the qubit which is responsible for the total number of 
+  # particles
+
+  H_q = tappering.tapper(H_q, Nq-1, Nelec%2)
+  N_part_q = tappering.tapper(N_part_q,Nq-1,Nelec%2)
+  Jz_q = tappering.tapper(Jz_q,Nq-1,Nelec%2)
+  Parity_q = tappering.tapper(Parity_q, Nq-1, Nelec%2)
 
 
-# Jz matrix ---------------------------------------------------------
-tmp = np.identity(Nq)
-for i,orb in enumerate(orb_arr):
-  tmp[i,i] = orb.m
+  # tapper the qubit which is responsible for the total number of 
+  # particles
+  H_q = tappering.tapper(H_q, iq_even_first-1, Parity_tot)
+  N_part_q = tappering.tapper(N_part_q,iq_even_first-1,Parity_tot)
+  Jz_q = tappering.tapper(Jz_q,iq_even_first-1,Parity_tot)
+  Parity_q = tappering.tapper(Parity_q, iq_even_first-1, Parity_tot)
 
-Jz_op = build_ferm_op_from_ints(one_body_integrals=tmp)
-Jz_q = qubit_converter.convert(Jz_op)
-Jz_mtrx = Jz_q.to_matrix().real
+
+
+Nq = H_q.num_qubits
+print( "Nq after tappering = ", Nq, flush=True )
+
 #exit()
 # -------------------------------------------------------------------
 
 
-# Total Hamiltonian matrix ------------------------------------------
+
+# Matrices ----------------------------------------------------------
 H_mtrx = H_q.to_matrix().real
+N_part_mtrx = N_part_q.to_matrix().real
+Jz_mtrx = Jz_q.to_matrix().real
+
+Parity_mtrx = Parity_q.to_matrix().real
+for i in range(len(Parity_mtrx[:,0])):
+  Parity_mtrx[i,i] %= 2
+
 
 # Find eigenvalues and eigenvectors of the Hamiltonian
 energy, wf = np.linalg.eigh(H_mtrx)
+#for e in energy:
+  #print(e)
+#exit()
 
 
 # Diagonalize Jz matrix ---------------------------------------------
@@ -364,7 +448,7 @@ indx_arr = [0]
 for i in range(1,2**Nq):
   diff = energy[i]-energy[i-1]
 
-  if diff < 5.e-14:
+  if diff < 5.e-12:
     indx_arr.append(i)
     continue
 
@@ -386,11 +470,61 @@ for i in range(1,2**Nq):
   val, vec = np.linalg.eigh(Jz_mtrx_new)
 
   wf[:,indx_arr] = np.matmul(wf[:,indx_arr],vec)
-
+  
   # Preparation for a new cluster
   indx_arr = [i]
 #exit()
 # -------------------------------------------------------------------
+
+
+
+# -------------------------------------------------------------------
+class sl_dets_with_symmetries:
+  def __init__(self, bn, n, p, j):
+    self.bn_arr = [bn]
+    self.n = n
+    self.p = p
+    self.j = j
+
+
+SD_sym = []
+for i in range(2**Nq):
+  bn = bin(i)[2:].zfill(Nq)
+
+  wf_bn = bin_to_vec(bn)
+
+  jz = np.conj( wf_bn.T ).dot( Jz_mtrx.dot( wf_bn )).item(0)
+  parity = np.conj( wf_bn.T ).dot( Parity_mtrx.dot( wf_bn )).item(0)
+  npart = np.conj(wf_bn.T).dot( N_part_mtrx.dot( wf_bn) ).item(0)
+
+  found = False
+  for el in SD_sym:
+    if el.n == npart and el.p == parity and el.j == jz:
+      el.bn_arr.append(bn)
+      found = True
+      break
+
+  if not found:
+    SD_sym.append( sl_dets_with_symmetries(bn, npart, parity, jz) )
+
+
+
+counter = 0
+for el in SD_sym:
+  if int(el.n) != Nelec:
+    continue
+
+  if el.p != Parity_tot:
+    continue
+
+  print("J_z = ", el.j, "P = ", int(el.p), "N_SlDet = ", len(el.bn_arr))
+  for b in el.bn_arr:
+    print(b)
+  print()
+#exit()
+# -------------------------------------------------------------------
+
+
 
 
 # Find the energy of the ground and first excited states
@@ -420,53 +554,35 @@ for i in range(2**Nq):
     
 print("\n","Ne", 
       f'{"Eg": >8}', 
-      f'{"Ee": >8}', 
-      f'{"Jz": >4}', 
-      f'{"Ndet": >5}', 
-      f'{"Nconf": >7}')
+      f'{"Ee": >12}', 
+      f'{"Jz": >4}')
 for i, ne in enumerate(ne_arr):
   #if ne != Nelec:
     #continue
+
+  if indx_g[i] == -1:
+    continue
+
+  #indx = np.argsort( abs(wf[:,indx_g[i]]), axis=0 )
+
+  jz_g = np.conj( wf[:,indx_g[i]].T ).dot( 
+    Jz_mtrx.dot( wf[:,indx_g[i]] )).item(0)
   
-  indx = np.argsort( abs(wf[:,indx_g[i]]), axis=0 )
-  jz_g = get_jz( orb_arr, bin( indx[-1] )[2:].zfill(Nq) )
-  parity_g = get_parity( orb_arr, bin( indx[-1] )[2:].zfill(Nq) )
+  parity_g = int(np.conj( wf[:,indx_g[i]].T ).dot( 
+    Parity_mtrx.dot( wf[:,indx_g[i]] )).item(0))
 
-  Sl_det = []
-  conf_arr = []
-  for ii in range(2**Nq):
-    bn = bin(ii)[2:].zfill(Nq)
-    jz = get_jz( orb_arr, bn )
-    parity = get_parity( orb_arr, bn )
-
-    if bn.count("1") == ne and jz == jz_g and parity == parity_g:
-      Sl_det.append(bn)
-      #print(bn)
-
-      conf = bin_to_conf( orb_arr, bn )
-      if not (conf in conf_arr):
-        conf_arr.append(conf)
-
-  NSl_det = len(Sl_det)
 
   if indx_e[i] != -1:
     print(f'{ne: >3}', 
-          f'{energy[indx_g[i]]: .5f}', 
-          f'{energy[indx_e[i]]: .5f}', 
-          f'{jz_g: 4.1f}', 
-          f'{NSl_det: > 5}', 
-          f'{len(conf_arr): >7}')
+          f'{energy[indx_g[i]]: 10.5f}', 
+          f'{energy[indx_e[i]]: 10.5f}', 
+          f'{jz_g: 4.1f}')
   else:
     print(f'{ne: >3}', 
-          f'{energy[indx_g[i]]: .5f}', 
-          " "*8,
-          f'{jz_g: 4.1f}', 
-          f'{NSl_det: > 5}', 
-          f'{len(conf_arr): >7}')
+          f'{energy[indx_g[i]]: 10.5f}', 
+          " "*10,
+          f'{jz_g: 4.1f}')
 
-  # All possible Slater Determinants
-  #for det in Sl_det:
-    #print(det)
 #exit()
 # -------------------------------------------------------------------
 
@@ -488,272 +604,319 @@ if Q_on:
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-dtau = 0.5
+dtau = 1.e-2
 # In principle the value of dtau and the difference in energy between 
 # ground and excited states defines the number of necessary steps
 # for propagation in imaginary time
 
 
+# Construct exp(-tau H) matrix ======================================
+exp_tau_H = np.zeros((2**Nq,2**Nq))
+for i in range(2**Nq):
+  P = np.outer( wf[:,i], np.conj(wf[:,i]) )
+  exp_tau_H += math.exp(-dtau*energy[i]) * P
+# ===================================================================
+
+
+
 # Preparation -------------------------------------------------------
-#anzatz_tp = 0
-#Nlayers = 1
-#rot = []
+ansatz = ansatz_cls(ansatz_tp, Nlayers, Nq, rot)
 
-Uent = None
-Uent_circ = None
-
-if anzatz_tp == 0:
-  rot = [2]
-  # in rot can be any number of rotations
-  # values can be only 1,2, or 3 related to Rx, Ry, and Rz, respectively
-  #
-  # --- rot[1](ang_0) --- rot[2](ang_4) ---.-------
-  #                                        |
-  # --- rot[1](ang_1) --- rot[2](ang_5) ---x-.-----
-  #                                          |
-  # --- rot[1](ang_2) --- rot[2](ang_6) -----x-.---
-  #                                            |
-  # --- rot[1](ang_3) --- rot[2](ang_7) -------x---
-  #
-  # + final layer of rotations
-  Nparam = (Nlayers + 1) * Nq * len(rot)
-  Uent = entangling_mtrx(Nq)
-  if Q_on:
-    Uent_circ = entangling_circ(Nq)
-    print(Uent_circ)
-
-
-if anzatz_tp == 1:
-  # ---.-------
-  #    |
-  #   [R](ang_0)
-  #    |
-  # ---.------.---
-  #           |
-  #          [R](ang_2)
-  #           |
-  # ---.------.---
-  #    |
-  #   [R](ang_1)
-  #    |
-  # ---.-------
-  Nparam = Nlayers * (Nq - 1)
-
-if anzatz_tp == 2:
-  Nparam = 4
-
-
-rot_ang_c = math.pi*(2*np.random.rand(Nparam)-1)
-rot_ang_q = rot_ang_c.copy()
+Nparam = ansatz.nparams 
 print("Total number of parameters in anzatz = ", Nparam, flush=True)
 
-
-
-# Calculate derivative matrices for classical calculations
-dU = deriv_mtrx(anzatz_tp, rot, Nq)
-
+rot_angs = math.pi*(2*np.random.rand(Nparam)-1)
+#rot_angs = np.zeros(Nparam)
 
 # Exact ground-state wave function for given number of electrons
+
+
 psi_exact = wf[:,indx_g[Nelec]].copy()
-np.save("psi_exact", psi_exact)
-
-
 indx = np.argsort( abs(psi_exact), axis=0 )
-print("\n","Exact wave function (dominant contributions)")
-for i in range(2**Nq):
-  ii = indx[2**Nq-1-i]
-  bn_ii = bin(ii)[2:].zfill(Nq)
-  x = psi_exact[ ii ]
-
-  if abs(x)**2 > 1.e-15:
-    print( f'{i: >2}', 
-          bn_ii, 
-          x,
-          f'{abs(x)**2: .5f}', 
-          bin_to_conf( orb_arr, bn_ii ), flush=True)
-
 
 # Dominant contribution comes from the Slater determinant
 # with the binary representation 
 psi_i_bn = bin( 
   int( np.argsort( abs(psi_exact), axis=0 )[-1] ) 
   )[2:].zfill(Nq)
-
-if anzatz_tp == 2:
-  psi_i_bn = "00110010"
 print("\n","Initial guess = ", psi_i_bn, flush=True)
 
 
-#exit()
-# Convert to the Pauli string of X and I gates 
-# for preparation as a quantum circuit
-psi_i_ps = [ psi_i_bn[i] for i in range(Nq)]
-
-if Q_on:
-  psi_i_circ = ps_2_circ(psi_i_ps)
-  print(psi_i_circ)
-
-  
-
-# For evaluation by classical algorithms we need a vector
-psi_i_vec = ps_2_vec(psi_i_ps, Nq)
-np.save("psi_in", psi_i_vec)
-#exit()
-
-
-# Check anzatz - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-def fun(vctr):
-  psi_f_vec = apply_anzatz(anzatz_tp, rot, Nlayers, vctr, Nq,
-                           psi_i_vec, Uent)
-
-  diff = np.linalg.norm(psi_f_vec - psi_exact)**2.0
-  #E = (psi_f_vec.conj().T).dot( H_mtrx.dot(psi_f_vec) ).item().real
-  return diff
-
-def dfun(vctr):
-  res = np.zeros((Nparam),dtype=float)
-
-# All layers are calculated and stored since they will be used 
-# Nparam = len(vctr) times for the evaluation of the derivative
-  U = anzatz_matrices(anzatz_tp, rot, Nlayers, vctr, Nq)
-
-  for a in range(Nparam):
-    dpsi_f_vec = apply_danzatz(anzatz_tp, rot, Nlayers, vctr, Nq, 
-                               U, dU, a, psi_i_vec, Uent)
-
-    res[a] = -2 * (dpsi_f_vec.conj().T).dot( psi_exact ).item(0).real
+jz_g = average_value_for_bn_mtrx(psi_i_bn, Jz_mtrx)
+print("For this state: jz = ", jz_g,
+      "Energy = ", average_value_for_bn_mtrx(psi_i_bn, H_mtrx))
 
 
 
-  return res
-
-rot_ang_bst = scipy.optimize.minimize(fun, 
-                                      rot_ang_c, 
-                                      method='Newton-CG', 
-                                      jac=dfun, 
-                                      tol=1.e-12).x
-
-
-#print("Best rotation angles \n", 
-      #np.array([x - 2*pi*math.floor(x/(2*pi)) for x in rot_ang_bst]) )
-#print("Best rotation angles \n", rot_ang_bst/pi, flush=True )
-
-psi_f_vec = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_bst, Nq,
-                         psi_i_vec, Uent)
-
-diff = np.linalg.norm(psi_f_vec - psi_exact)**2.0
-print( "Diff with exact wf = ", diff, flush=True )
-
-
-print( "\n", " "*Nq, f'{"exact": >7}', f'{"approx": >8}', flush=True )
+print("\n","Exact wave function")
+print(f'{"weight": >18}', " "*2, f'{"contribution to E": >17}')
 for i in range(2**Nq):
-  if abs(psi_f_vec[i])**2 > 1.e-5 or abs(psi_exact[i])**2 > 1.e-5:
-    print( bin(i)[2:].zfill(Nq), 
-          f'{abs(psi_exact[i])**2: .5f}', 
-          f'{abs(psi_f_vec[i])**2: .5f}', flush=True
-          )
+  ii = indx[2**Nq-1-i]
+  bn_ii = bin(ii)[2:].zfill(Nq)
 
-E = (psi_f_vec.conj().T).dot( H_mtrx.dot(psi_f_vec) ).item().real
-print("\n","For these angles one obtains E_g = ", E, 
-      "\n","diff with exact = ", f'{E - energy[indx_g[Nelec]]: .1e}',
-      flush=True)
+  npart = average_value_for_bn_mtrx(bn_ii, N_part_mtrx)
+  if npart != Nelec:
+    continue
+
+  jz = average_value_for_bn_mtrx(bn_ii, Jz_mtrx)
+  if jz != jz_g:
+    continue
+
+  parity = average_value_for_bn_mtrx(bn_ii, Parity_mtrx)
+  if parity != Parity_tot:
+    continue
+
+  print( f'{i: >2}', bn_ii, 
+        f'{psi_exact[ ii ]**2: .6f}',
+        average_value_for_bn_mtrx(bn_ii, H_mtrx)*psi_exact[ ii ]**2)
+
+
+     
+psi_in = bin_to_vec(psi_i_bn)
+
+
+def calculate_E(angs, psi_in):
+    psi_out = ansatz.act_on_vctr(angs, psi_in)
+
+    E = (psi_out.conj().T).dot( H_mtrx.dot(psi_out) ).item().real
+    return E
+
+
+adam = optimizers.Adam_cls(Nparam, eta=0.05)
+NG = optimizers.NatGrad_cls(Nparam, eta=0.05)
+ITE = optimizers.ITE_cls(Nparam, eta=0.05)
+
+optims = [adam, NG, ITE]
+#optims = [adam, NG]
+#optims = [adam]
+
+angs = [rot_angs.copy()] * len(optims)
+E_old = [None] * len(optims)
+
+for i,opt in enumerate(optims):
+  opt.f = calculate_E(angs[i], psi_in)
+
+
+Niters_max = 2000
+eps = 1.e-8
+
+txt = ""
+for opt in optims:
+  txt += "   " + opt.name + "   "
+print("\n"," "*5, txt)  
+
+iters = 1
+while any([not x.converged for x in optims]) and \
+  all([x.t <= Niters_max for x in optims]):
+
+  txt_out = ""
+
+  for i,opt in enumerate(optims):
+    if opt.converged:
+      txt_out += " "*10
+      continue
+    
+    angs[i] = optimizers.update_angles(ansatz, angs[i], 
+                                       opt, psi_in, H_mtrx)
+    E_old[i] = opt.f
+    opt.f = calculate_E(angs[i], psi_in)
+
+    if abs(opt.f - E_old[i]) < eps:
+      opt.converged = True
+
+    txt_out += f' {opt.f: .6f}'
+
+  if iters%50 == 0:
+    print(f'{iters:>5}', txt_out)
+    
+  iters += 1
+      
+      
+
+psi_out = []
+txt_E = f'{energy[indx_g[Nelec]]: .5f}'
+txt_name = "  Exact   "
+for i,opt in enumerate(optims):
+  psi_out.append( ansatz.act_on_vctr(angs[i], psi_in) )
+
+  txt_name += "   " + opt.name + "   "
+  txt_E += f' {opt.f: .6f}'
+
+print("\n",txt_name, "\n", txt_E, "\n")
+
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#for i in range(2**Nq):
+  #if any([abs(psi[i])**2 > 1.e-5 for psi in psi_out]):
+    #bn = bin(i)[2:].zfill(Nq)
+
+    #wf_bn = bin_to_vec(bn)
+
+    #jz = np.conj( wf_bn.T ).dot( Jz_mtrx.dot( wf_bn )).item(0)
+    #npart = np.conj(wf_bn.T).dot( N_part_mtrx.dot( wf_bn) ).item(0)
+
+    #txt_out = str(bn)
+    #if abs(psi_exact[i])**2 > 1.e-5:
+      #txt_out = yellow_highlighting(txt_out)
+
+    #txt_out += f'{abs(psi_exact[i])**2: .5f}'
+
+    #for psi in psi_out:
+      #txt_out += f'{abs(psi[i].item())**2: .5f}'
+      
+    #print( txt_out, jz, npart )
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+## Newton-CG - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+#obj = scipy.optimize.minimize(fun, rot_ang_c, 
+                              ##method='Nelder-Mead',
+                              ##method='COBYLA',
+                              #method='Newton-CG', jac=dfun, 
+                              ##method='CG', jac=dfun,
+                              ##method='BFGS', jac=dfun,
+                              #tol=1.e-12,
+                              #options={"maxiter": 10000, "disp": False })
+
+#rot_ang_bst = obj.x
+#psi_f_vec = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_bst, Nq,
+                         #psi_i_vec, Uent)
+#E_Newton = (psi_f_vec.conj().T).dot( H_mtrx.dot(psi_f_vec) ).item().real
+## - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+
+
+
+
+
+## VQE ===============================================================
+#VQE_on = False
+#if VQE_on:
+  #E_q = measure_Ham(anzatz_tp, psi_i_circ, Uent_circ,
+                    #Nlayers, rot, rot_ang_bst, 
+                    #ps_meas, indx_ps2meas, H_q, 
+                    #noise_off=noise_off)
+  #print("E_VQE = ", E_q)
+## ===================================================================
+
+
+## Test new imaginary time propagation ===============================
+#psi = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, psi_i_vec, Uent)
+#Nstps, converged, H_av = get_Nsteps_for_exp_tauH(psi, H_mtrx, exp_tau_H)
+#if converged:
+  #print("Converged in ", Nstps, "got <H> = ", H_av)
+#else:
+  #print("NOT converged in ", Nstps, "got <H> = ", H_av)
+
 #exit()
-# Anzatz checked ----------------------------------------------------
+## ===================================================================
 
 
+## Propagation in accordance to McArdle ==============================
+#psi_tauH = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
+                        #psi_i_vec, Uent)
+
+#U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
+#for it in range(10000):
+  #A_mtrx_c = np.zeros((Nparam,Nparam),dtype=float)
+  #C_vec_c = np.zeros((Nparam),dtype=float)
+
+  #if Q_on:
+    #A_mtrx_q = np.zeros((Nparam,Nparam),dtype=float)
+    #C_vec_q = np.zeros((Nparam),dtype=float)
+
+  #psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
+                       #psi_i_vec, Uent)
+
+  ## apply exact exp(-tau H) - - - - - - - - - - - - - - - - - - - - -
+  #psi_tauH = exp_tau_H.dot(psi_c)
+  #psi_tauH /= np.linalg.norm(psi_tauH)
 
 
-# VQE ===============================================================
-VQE_on = True
-if VQE_on:
-  E_q = measure_Ham(anzatz_tp, psi_i_circ, Uent_circ,
-                    Nlayers, rot, rot_ang_bst, 
-                    ps_meas, indx_ps2meas, H_q, 
-                    noise_off=noise_off)
-  print("E_VQE = ", E_q)
-# ===================================================================
+## Calculate C -------------------------------------------------------
+  #for a in range(Nparam):
+    #dpsi_c_a = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
+                               #U, dU, a, psi_i_vec, Uent)
+
+    #C_vec_c[a] = -2 * (dpsi_c_a.conj().T).dot( H_mtrx.dot(psi_c) ).item(0).real
 
 
-
-
-# Propagation in accordance to McArdle ==============================
-U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
-for it in range(100000):
-  A_mtrx_c = np.zeros((Nparam,Nparam),dtype=float)
-  C_vec_c = np.zeros((Nparam),dtype=float)
-
-  if Q_on:
-    A_mtrx_q = np.zeros((Nparam,Nparam),dtype=float)
-    C_vec_q = np.zeros((Nparam),dtype=float)
-
-  psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
-                       psi_i_vec, Uent)
-
-# Calculate C -------------------------------------------------------
-  for a in range(Nparam):
-    dpsi_c_a = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
-                               U, dU, a, psi_i_vec, Uent)
-
-    C_vec_c[a] = -2 * (dpsi_c_a.conj().T).dot( H_mtrx.dot(psi_c) ).item(0).real
-
-
-    if Q_on:
-      C_vec_q[a] = -clc_c_vec(anzatz_tp, psi_i_circ, Uent_circ, 
-                             Nlayers, rot, rot_ang_q, a,
-                             ps_meas, indx_ps2meas, H_q,
-                             noise_off=noise_off)
-      #print("C_vec_q[a] = ", C_vec_q[a])
+    #if Q_on:
+      #C_vec_q[a] = -clc_c_vec(anzatz_tp, psi_i_circ, Uent_circ, 
+                             #Nlayers, rot, rot_ang_q, a,
+                             #ps_meas, indx_ps2meas, H_q,
+                             #noise_off=noise_off)
+      ##print("C_vec_q[a] = ", C_vec_q[a])
 
       
-# Calculated A matrix -----------------------------------------------
-    for b in range(a, Nparam):
-      dpsi_c_b = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
-                                U, dU, b, psi_i_vec, Uent)
+## Calculated A matrix -----------------------------------------------
+    #for b in range(a, Nparam):
+      #dpsi_c_b = apply_danzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq, 
+                                #U, dU, b, psi_i_vec, Uent)
 
-      A_mtrx_c[a,b] = 2*(dpsi_c_a.conj().T).dot( dpsi_c_b ).item(0).real
-      A_mtrx_c[b,a] = A_mtrx_c[a,b]
+      #A_mtrx_c[a,b] = 2*(dpsi_c_a.conj().T).dot( dpsi_c_b ).item(0).real
+      #A_mtrx_c[b,a] = A_mtrx_c[a,b]
 
-      if Q_on:
-        A_mtrx_q[a,b] = clc_a_mtrx(anzatz_tp, psi_i_circ, Uent_circ,
-                                   Nlayers, rot, rot_ang_q, a, b,
-                                   noise_off=noise_off)
-        A_mtrx_q[b,a] = A_mtrx_q[a,b]
+      #if Q_on:
+        #A_mtrx_q[a,b] = clc_a_mtrx(anzatz_tp, psi_i_circ, Uent_circ,
+                                   #Nlayers, rot, rot_ang_q, a, b,
+                                   #noise_off=noise_off)
+        #A_mtrx_q[b,a] = A_mtrx_q[a,b]
 
 
-# Calculate new values of angles ------------------------------------
-  dtheta_c = solve_Ax_b(A_mtrx_c, C_vec_c)
-  rot_ang_c += dtau * dtheta_c
+## Calculate new values of angles ------------------------------------
+  ##dtheta_c = solve_Ax_b(A_mtrx_c, C_vec_c)
+  #dtheta_c = solve_Ax_b_L_curve(A_mtrx_c, C_vec_c)
+  ##print("dtheta_c = ", dtheta_c - dtheta_tst)
+  #rot_ang_c += dtau * dtheta_c
   
 
 
-# Average value of Hamiltonian and wf measurements ------------------
-  U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
-  psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
-                       psi_i_vec, Uent)
+## Average value of Hamiltonian and wf measurements ------------------
+  #U = anzatz_matrices(anzatz_tp, rot, Nlayers, rot_ang_c, Nq)
+  #psi_c = apply_anzatz(anzatz_tp, rot, Nlayers, rot_ang_c, Nq,
+                       #psi_i_vec, Uent)
 
-  E = (psi_c.conj().T).dot( H_mtrx.dot(psi_c) ).item().real
+  #E = (psi_c.conj().T).dot( H_mtrx.dot(psi_c) ).item().real
+
+  #stps_left, converged, H_av = get_Nsteps_for_exp_tauH(psi_c, H_mtrx, exp_tau_H)
+  ##print(np.amax(abs(psi_tauH - psi_c)))
+
+## It will be nice to reduce the step (dtau), when 
+## the local minima is found
+  #if converged:
+    #print("<E> = ", f'{E: .5f}', 
+          #"|psi - psi_tauH| = ", 
+          #f'{ np.linalg.norm(psi_c - psi_tauH)**2.0: .1e}',
+          #"Steps left: ", stps_left, 
+          #flush=True)
+  #else:
+    #print("<E> = ", f'{E: .5f}', 
+          #"|psi - psi_tauH| = ", 
+          #f'{ np.linalg.norm(psi_c - psi_tauH)**2.0: .1e}',
+          #"Steps left: >", stps_left, 
+          #flush=True)
+
+  ##if it%100 == 0:
+    ##print("<E> = ", f'{E: .5f}', 
+          ##"|psi - psi_exct| = ", 
+          ##f'{ np.linalg.norm(psi_c - psi_exact)**2.0: .1e}',
+          ##np.amax(abs(dtheta_c)), flush=True)
+
+  ##if np.amax(abs(dtheta_c)) < 1.e-5:
+    ##break
+  ##exit()
 
 
-# It will be nice to reduce the step (dtau), when 
-# the local minima is found
-  if it%100 == 0:
-    print("<E> = ", f'{E: .5f}', 
-          "|psi - psi_exct| = ", 
-          f'{ np.linalg.norm(psi_c - psi_exact)**2.0: .1e}',
-          np.amax(abs(dtheta_c)), flush=True)
-  if np.amax(abs(dtheta_c)) < 1.e-3:
-    break
+##print("Best rotation angles \n", rot_ang_bst, flush=True )
+#print("Angles from imaginary time\n", rot_ang_c, flush=True )
 
 
-print("Best rotation angles \n", rot_ang_bst/pi, flush=True )
-print("Angles from imaginary time\n", rot_ang_c/pi%2, flush=True )
-
-
-# On output we have
-print( "\n", " "*Nq, f'{"exact": >7}', f'{"approx": >8}', flush=True )
-for i in range(2**Nq):
-  if abs(psi_c[i])**2 > 1.e-5 or abs(psi_exact[i])**2 > 1.e-5:
-    print( bin(i)[2:].zfill(Nq), 
-          f'{abs(psi_exact[i])**2: .5f}', 
-          f'{abs(psi_c[i])**2: .5f}', 
-          flush=True)
+## On output we have
+#print( "\n", " "*Nq, f'{"exact": >7}', f'{"approx": >8}', flush=True )
+#for i in range(2**Nq):
+  #if abs(psi_c[i])**2 > 1.e-5 or abs(psi_exact[i])**2 > 1.e-5:
+    #print( bin(i)[2:].zfill(Nq), 
+          #f'{abs(psi_exact[i])**2: .5f}', 
+          #f'{abs(psi_c[i])**2: .5f}', 
+          #flush=True)

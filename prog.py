@@ -25,11 +25,13 @@ from qiskit_nature.operators.second_quantization import FermionicOp
 from find_a import *
 from second_q_op_vaz import *
 from ps_mod import *
-from ansatz import *
 from routines import *
 
+import ansatz
 import tappering
 import optimizers
+
+import UCC_mod
 
 from quantum_mod import *
 
@@ -140,8 +142,8 @@ for ln in fl_inp.readlines():
   if key == "Nlayers":
     Nlayers = int(val)
 
-  if key == "rot":
-    rot = [int(x) for x in val.replace("[","").replace("]","").split(",")]
+  if key == "rot_exc":
+    rot_exc = [int(x) for x in val.replace("[","").replace("]","").split(",")]
 
   if key == "Q_on":
     Q_on = (val == "True")
@@ -154,6 +156,9 @@ for ln in fl_inp.readlines():
 
   if key == "Parity":
     Parity_tot = int(val)
+    
+  if key == "Jz":
+    Jz_tot = float(val)
 
 #exit()
 
@@ -510,17 +515,31 @@ for i in range(2**Nq):
 
 
 counter = 0
+E_bst = 100
+print("\nWave functions with given symmetries")
+print(" "*(Nq+4), f'{"HF energy":>10}')
 for el in SD_sym:
   if int(el.n) != Nelec:
     continue
 
   if el.p != Parity_tot:
     continue
+  
+  if el.j != Jz_tot:
+    continue
 
   print("J_z = ", el.j, "P = ", int(el.p), "N_SlDet = ", len(el.bn_arr))
   for b in el.bn_arr:
-    print(b)
+    wf_bn = bin_to_vec(b)
+    E_bn = np.conj( wf_bn.T ).dot( H_mtrx.dot( wf_bn )).item(0)
+
+    if E_bn < E_bst:
+      E_bst = E_bn
+      psi_i_bn = b
+    
+    print(b, E_bn)
   print()
+#print("Possible input function", psi_i_bn)
 #exit()
 # -------------------------------------------------------------------
 
@@ -533,18 +552,21 @@ ne_arr = range(norb+1)
 indx_g = [-1]*(norb+1)
 indx_e = [-1]*(norb+1)
 
+indx_exact = -1
+
 for i in range(2**Nq):
   npart = np.conj(wf[:,i].T).dot( N_part_mtrx.dot( wf[:,i]) ).item(0)  
   jz = np.conj(wf[:,i].T).dot( Jz_mtrx.dot( wf[:,i]) ).item(0)
 
-  #if int( round(npart)) == Nelec:
-    #print( energy[i], jz )
+  # The exact wave function for given symmetries
+  if abs(jz - Jz_tot) < 1.e-13 and int(round(npart)) == Nelec and indx_exact == -1:
+    indx_exact = i
 
   for ii, x in enumerate(ne_arr):
     if int(round(npart)) == x:
       if indx_g[ii] == -1:
         indx_g[ii] = i
-        break
+        #break
       # condition abs(...) > 1.e-13 is needed to get rid of degenerate states
       if indx_e[ii] == -1 and abs(energy[i] - energy[indx_g[ii]]) > 1.e-13:
         indx_e[ii] = i
@@ -582,74 +604,54 @@ for i, ne in enumerate(ne_arr):
           f'{energy[indx_g[i]]: 10.5f}', 
           " "*10,
           f'{jz_g: 4.1f}')
-
 #exit()
 # -------------------------------------------------------------------
 
 
 
 
-# Imaginary time propagation ========================================
+# ===================================================================
 #Q_on = True
 #noise_off = True
-create_noise_model(Nq, Nrep)
+#create_noise_model(Nq, Nrep)
 
 
 # Not all Pauli matrices have to be measured - - - - - - - - - - - - 
-if Q_on:
-  ps_meas, indx_ps2meas = extract_ps_for_measurement(H_q)
-  print("Hamiltonian consists of",len(indx_ps2meas),"PS", flush=True )
-  print("It is sufficient to measure", len(ps_meas), "of them", flush=True)
+#if Q_on:
+  #ps_meas, indx_ps2meas = extract_ps_for_measurement(H_q)
+  #print("Hamiltonian consists of",len(indx_ps2meas),"PS", flush=True )
+  #print("It is sufficient to measure", len(ps_meas), "of them", flush=True)
 #exit()
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-dtau = 1.e-2
+#dtau = 1.e-2
 # In principle the value of dtau and the difference in energy between 
 # ground and excited states defines the number of necessary steps
 # for propagation in imaginary time
 
 
 # Construct exp(-tau H) matrix ======================================
-exp_tau_H = np.zeros((2**Nq,2**Nq))
-for i in range(2**Nq):
-  P = np.outer( wf[:,i], np.conj(wf[:,i]) )
-  exp_tau_H += math.exp(-dtau*energy[i]) * P
+#exp_tau_H = np.zeros((2**Nq,2**Nq))
+#for i in range(2**Nq):
+  #P = np.outer( wf[:,i], np.conj(wf[:,i]) )
+  #exp_tau_H += math.exp(-dtau*energy[i]) * P
 # ===================================================================
 
 
-
-# Preparation -------------------------------------------------------
-ansatz = ansatz_cls(ansatz_tp, Nlayers, Nq, rot)
-
-Nparam = ansatz.nparams 
-print("Total number of parameters in anzatz = ", Nparam, flush=True)
-
-rot_angs = math.pi*(2*np.random.rand(Nparam)-1)
-#rot_angs = np.zeros(Nparam)
-
-# Exact ground-state wave function for given number of electrons
-
-
-psi_exact = wf[:,indx_g[Nelec]].copy()
+# Exact wave function and the initial approximation for it ----------
+psi_exact = wf[:,indx_exact].copy()
 indx = np.argsort( abs(psi_exact), axis=0 )
 
-# Dominant contribution comes from the Slater determinant
-# with the binary representation 
-psi_i_bn = bin( 
-  int( np.argsort( abs(psi_exact), axis=0 )[-1] ) 
-  )[2:].zfill(Nq)
 print("\n","Initial guess = ", psi_i_bn, flush=True)
-
-
-jz_g = average_value_for_bn_mtrx(psi_i_bn, Jz_mtrx)
-print("For this state: jz = ", jz_g,
-      "Energy = ", average_value_for_bn_mtrx(psi_i_bn, H_mtrx))
-
+print("For this state: Energy = ", average_value_for_bn_mtrx(psi_i_bn, H_mtrx))
 
 
 print("\n","Exact wave function")
-print(f'{"weight": >18}', " "*2, f'{"contribution to E": >17}')
+print(" "*Nq, 
+      f'{"weight": >10}', 
+      " "*2, 
+      f'{"contribution to E": >17}')
 for i in range(2**Nq):
   ii = indx[2**Nq-1-i]
   bn_ii = bin(ii)[2:].zfill(Nq)
@@ -659,20 +661,69 @@ for i in range(2**Nq):
     continue
 
   jz = average_value_for_bn_mtrx(bn_ii, Jz_mtrx)
-  if jz != jz_g:
+  if jz != Jz_tot:
     continue
 
   parity = average_value_for_bn_mtrx(bn_ii, Parity_mtrx)
   if parity != Parity_tot:
     continue
 
-  print( f'{i: >2}', bn_ii, 
-        f'{psi_exact[ ii ]**2: .6f}',
-        average_value_for_bn_mtrx(bn_ii, H_mtrx)*psi_exact[ ii ]**2)
+  contrib = average_value_for_bn_mtrx(bn_ii, H_mtrx) \
+          * psi_exact[ ii ]**2
+  if abs(contrib) > 1.e-5:
+    print( f'{i: >2}', bn_ii, 
+           f'{psi_exact[ ii ]**2: .6f}',
+           contrib )
 
 
-     
 psi_in = bin_to_vec(psi_i_bn)
+# -------------------------------------------------------------------
+
+
+# Preparation -------------------------------------------------------
+if ansatz_tp == 0:
+  ansatz = ansatz.hardware_efficient_ansatz(Nlayers, Nq, rot_exc)
+
+if ansatz_tp == 1:
+  ansatz = ansatz.two_qubit_rot_ansatz(Nlayers, Nq)
+
+if ansatz_tp == 2:
+  UCC_ClOps = UCC_mod.create_cluster_operators(psi_i_bn, 
+                                               Nelec, 
+                                               Parity_tot,
+                                               iq_even_first, 
+                                               orb_arr)
+
+  print("\nTotal number of cluster operators = ", len(UCC_ClOps))
+
+  num_excs = np.zeros(Nelec, dtype=int)
+  for x in UCC_ClOps:
+    if x.nex in rot_exc:
+      num_excs[x.nex-1] += 1
+      x.q_op(qubit_converter, Nelec)
+      x.Tq = tappering.tapper(x.Tq, Nq+1, Nelec%2)
+      x.Tq = tappering.tapper(x.Tq, iq_even_first-1, Parity_tot)
+      x.mtrx()
+    
+  print("Used ", sum(num_excs) )
+  exc_dct = {1:"Single", 
+             2:"Double", 
+             3:"Triple", 
+             4:"Quadruple", 
+             5:"Pentuple"}
+  for i,ex in enumerate(num_excs):
+    if ex == 0:
+      continue
+    print(f'{exc_dct[i+1]:>10}', f'{ex:>3}' )
+
+  ansatz = ansatz.UCC_ansatz(UCC_ClOps, rot_exc)
+
+
+Nparam = ansatz.nparams 
+print("Total number of parameters in anzatz = ", Nparam, flush=True)
+
+rot_angs = math.pi*(2*np.random.rand(Nparam)-1)
+#rot_angs = np.zeros(Nparam)
 
 
 def calculate_E(angs, psi_in):
@@ -686,15 +737,16 @@ adam = optimizers.Adam_cls(Nparam, eta=0.05)
 NG = optimizers.NatGrad_cls(Nparam, eta=0.05)
 ITE = optimizers.ITE_cls(Nparam, eta=0.05)
 
-optims = [adam, NG, ITE]
+#optims = [adam, NG, ITE]
 #optims = [adam, NG]
-#optims = [adam]
+optims = [adam]
 
 angs = [rot_angs.copy()] * len(optims)
 E_old = [None] * len(optims)
 
 for i,opt in enumerate(optims):
   opt.f = calculate_E(angs[i], psi_in)
+
 
 
 Niters_max = 2000

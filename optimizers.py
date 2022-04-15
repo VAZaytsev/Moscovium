@@ -108,9 +108,7 @@ class Adam_cls():
     # update
     self.t += 1
     
-    dx = self.eta*(m_corr/(np.sqrt(v_corr) + self.epsilon))
-
-    return x - dx
+    return x - self.eta*(m_corr/(np.sqrt(v_corr) + self.epsilon))
 # -------------------------------------------------------------------
 
 

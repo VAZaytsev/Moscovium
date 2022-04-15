@@ -1,7 +1,5 @@
 import os
-os.environ["OMP_NUM_THREADS"] = "8" # export OMP_NUM_THREADS=4
-
-
+os.environ["OMP_NUM_THREADS"] = "4" # export OMP_NUM_THREADS=4
  
 import numpy as np
 from numpy import pi
@@ -30,6 +28,9 @@ from routines import *
 import ansatz
 import tappering
 import optimizers
+#import pauli_tst
+import read_input
+import sl_det_fun
 
 import UCC_mod
 
@@ -50,12 +51,6 @@ from quantum_mod import *
 #
 # a+_1 = I+II = mtrx(I) (x) mtrx(I) (x) mtrx(a+) (x) mtrx(Z)
 
-name2l = {
-  "s": 0,
-  "p": 1,
-  "d": 2
-  }
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 def jl2k(j,l):
@@ -63,42 +58,7 @@ def jl2k(j,l):
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
-class rad_orb:
-  def __init__(self,n,l,j):
-    self.n = n
-    self.j = j
-    self.l = l
-
-    self.k = (-1)**int(l+j+0.5) * int(j + 0.5)
-
-    self.i = -1
-  def __eq__(self, other):
-    return self.k == other.k and self.n == other.n
-  
-  def __str__(self):
-    return str(self.n) + " " + str(self.k)
-
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
-class orb_cls:
-  def __init__(self,n,k,m):
-    self.n = n
-    self.k = k
-    self.m = m
-
-    self.i = -1
-
-    self.j = abs(k) - 0.5
-    self.l = int( abs(k + 0.5) - 0.5 )
-
-  def __eq__(self, other):
-    return self.k == other.k and self.n == other.n and self.m == other.m
-
-  def __str__(self):
-    return str(self.n) + " " + str(self.k) + " " + str(self.m)
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-
 def find_orb(arr, indx, m):
   for i,x in enumerate(arr):
     if indx == x.i and m == x.m:
@@ -114,211 +74,32 @@ def yellow_highlighting(word):
 
 
 # Read files --------------------------------------------------------
-#fl_1b_int = open(sys.argv[1],"r")
-#fl_2b_int = open(sys.argv[2],"r")
-#norb_max = int(sys.argv[3])
-fl_inp = open(sys.argv[1],"r")
+fl_inp_name = sys.argv[1]
 
-for ln in fl_inp.readlines():
-  if ln == "\n":
-    continue
+Nelec, Jz_tot, Parity_tot, tappering_on, orb_arr, one_b_int, two_b_int, ansatz_info = read_input.read(fl_inp_name)
+norb = len(orb_arr)
 
-  key, val = ln.strip().replace(" ","").split("=")
-  if key == "OBI":
-    fl_1b_int = open(val,"r")
+ansatz_tp = ansatz_info.tp
+Nlayers = ansatz_info.L
+rot_exc = ansatz_info.rot_exc
+split_ent_layers = ansatz_info.split
 
-  if key == "TBI":
-    fl_2b_int = open(val,"r")
-
-  if key == "Nelec":
-    Nelec = int(val)
-
-  if key == "norb":
-    norb_max = int(val)
-
-  if key == "ansatz_tp":
-    ansatz_tp = int(val)
-
-  if key == "Nlayers":
-    Nlayers = int(val)
-
-  if key == "rot_exc":
-    rot_exc = [int(x) for x in val.replace("[","").replace("]","").split(",")]
-
-  if key == "Q_on":
-    Q_on = (val == "True")
-
-  if key == "noise_off":
-    noise_off = (val == "True")
-
-  if key == "Nrep":
-    Nrep = int(val)
-
-  if key == "Parity":
-    Parity_tot = int(val)
-    
-  if key == "Jz":
-    Jz_tot = float(val)
-
-#exit()
-
-
-# reading one-electron orbitals - - - - - - - - - - - - - - - - - - -
-read_states = False
-rad_orb_arr = []
-for ln in fl_1b_int.readlines():
-  if ln == "\n":
-    continue
-
-  arr = ln.split()
-
-  if arr[0] == "Ni":
-    read_states = True
-    continue
-  
-  if arr[0] == "n1":
-    break
-
-  if read_states:
-    sz = len(arr[1])
-    n = int( arr[1][:sz-1] )
-    l = name2l[ arr[1][sz-1] ]
-    j = 0.5*float( arr[3].split("/")[0] )
-    indx = int(arr[0])
-    
-    rad_orb_arr.append( rad_orb(n,l,j) )
-    rad_orb_arr[-1].i = indx
-# End reading one-electron orbitals - - - - - - - - - - - - - - - - -
-
-
-# creating spin-orbitals - - - - - - - - - - - - - - - - - - - - - - 
-orb_arr = []
-
-# There can be not enough space for all orbitals
-# some orbitals are deleted
-norb = 0
-delete_from = -1
-for i,x in enumerate(rad_orb_arr):
-  if norb + 2*x.j + 1 > norb_max:
-    delete_from = i
-    break
-  norb += int(2*x.j + 1)
-
-
-sz = len(rad_orb_arr) - delete_from
-for i in range(sz):
-  if delete_from == -1:
-    continue
-  rad_orb_arr.pop(delete_from)
-  
-# sort orbitals with respect to parity
-rad_orb_arr = sorted( rad_orb_arr, key = lambda x: (-1)**x.l, reverse=False )
-
-
-for x in rad_orb_arr:
-  for m in range( 1, int(2*x.j+1)+1, 2 ):
-    for s in range(-1,2,2):
-      orb_arr.append( orb_cls(x.n, x.k, 0.5*m*s) )
-      orb_arr[-1].i = x.i
-
-
-print("\nFollowing orbitals are used")
+print('\n','Following orbitals are used')
 iq_even_first = -1
+print(' Q ', ' n ', ' l ', ' 2j ', ' 2m ', '  Energy')
 print("Odd")
 for i,x in enumerate(orb_arr):
   if x.l%2 == 0 and iq_even_first == -1:
     iq_even_first = i
     print("Even")
-    
-  print("q"+str(i), x, x.l)
+  print(f'{i: >2}', 
+        f' {x.n: >2}', 
+        f' {x.l: >2}', 
+        f' {x.j: >3}', 
+        f' {x.m: >3} ', 
+        one_b_int[i,i] )
 print()
 
-one_b_int = np.zeros([norb,norb])
-two_b_int = np.zeros([norb,norb,norb,norb])
-
-#exit()
-fl_1b_int.seek(0)
-# end creating spin-orbitals - - - - - - - - - - - - - - - - - - - - 
-
-
-# Read one-body integrals - - - - - - - - - - - - - - - - - - - - - -
-read_int = False
-for ln in fl_1b_int.readlines():
-  if ln == "\n":
-    continue
-
-  arr = ln.split()
-  if arr[0] == "n1":
-    read_int = True
-    continue
-
-  if read_int:
-    i = int(arr[0])
-    j = int(arr[1])
-    h_ij = float( arr[2] )
-    
-    for iorb,x in enumerate(orb_arr):
-      for jorb,y in enumerate(orb_arr):
-        if x.m == y.m and i == x.i and j == y.i:
-          one_b_int[iorb,jorb] = h_ij
-          one_b_int[jorb,iorb] = h_ij
-# End reading one-body integrals - - - - - - - - - - - - - - - - - - 
-
-
-# Read two-body integrals - - - - - - - - - - - - - - - - - - - - - -
-read_int = False
-for ln in fl_2b_int.readlines():
-  if ln == "\n":
-    continue
-
-  arr = ln.split()
-
-  if arr[0] == "n1":
-    read_int = True
-    continue
-
-  if read_int:
-    i = np.zeros((4),dtype=int)
-    for ii in range(4):
-      i[ii] = int( arr[ii] )
-
-    m = np.zeros((4),dtype=float)
-    for ii in range(4):
-      m[ii] = 0.5*float( arr[4+ii] )
-      
-    u_coul_dir = float( arr[8] )
-    u_coul_ex = float( arr[9] )
-    u_br_dir = float( arr[10] )
-    u_br_ex = float( arr[11] )
-
-    p = find_orb(orb_arr, i[0], m[0])
-    if p == -1:
-      continue
-    q = find_orb(orb_arr, i[1], m[1])
-    if q == -1:
-      continue
-    r = find_orb(orb_arr, i[2], m[2])
-    if r == -1:
-      continue    
-    s = find_orb(orb_arr, i[3], m[3])
-    if s == -1:
-      continue
-
-    # direct
-    two_b_int[p,q,r,s] = u_coul_dir + u_br_dir
-    two_b_int[q,p,s,r] = u_coul_dir + u_br_dir
-
-    two_b_int[s,r,q,p] = u_coul_dir + u_br_dir
-    two_b_int[r,s,p,q] = u_coul_dir + u_br_dir
-
-    # exchange
-    two_b_int[p,q,s,r] = u_coul_ex + u_br_ex
-    two_b_int[q,p,r,s] = u_coul_ex + u_br_ex
-
-    two_b_int[r,s,q,p] = u_coul_ex + u_br_ex
-    two_b_int[s,r,p,q] = u_coul_ex + u_br_ex
-
-# ===================================================================
 
 
 # Number of particles -----------------------------------------------
@@ -329,7 +110,7 @@ N_part_op = build_ferm_op_from_ints(one_body_integrals=np.identity(norb))
 # Jz ----------------------------------------------------------------
 tmp = np.identity(norb)
 for i,orb in enumerate(orb_arr):
-  tmp[i,i] = orb.m
+  tmp[i,i] = 0.5*orb.m
 
 Jz_op = build_ferm_op_from_ints(one_body_integrals=tmp)
 # -------------------------------------------------------------------
@@ -400,13 +181,15 @@ Jz_q = qubit_converter.convert(Jz_op)
 Nq = H_q.num_qubits
 print( "Nq before tappering = ", Nq, flush=True )
 
-
-
 # Tappering qubits --------------------------------------------------
-Tappering_on = True
-if Tappering_on:
+if tappering_on:
   # tapper the qubit which is responsible for the total number of 
   # particles
+  iq_even_first = -1
+  for i,x in enumerate(orb_arr):
+    if x.l%2 == 0 and iq_even_first == -1:
+      iq_even_first = i
+      break
 
   H_q = tappering.tapper(H_q, Nq-1, Nelec%2)
   N_part_q = tappering.tapper(N_part_q,Nq-1,Nelec%2)
@@ -426,6 +209,10 @@ if Tappering_on:
 Nq = H_q.num_qubits
 print( "Nq after tappering = ", Nq, flush=True )
 
+
+#pauli_txt.p_tst(H_q)
+#obj = H_q.primitive.to_list()[-1]
+#print(obj, type(obj))
 #exit()
 # -------------------------------------------------------------------
 
@@ -484,62 +271,30 @@ for i in range(1,2**Nq):
 
 
 # -------------------------------------------------------------------
-class sl_dets_with_symmetries:
-  def __init__(self, bn, n, p, j):
-    self.bn_arr = [bn]
-    self.n = n
-    self.p = p
-    self.j = j
+SD_sym = sl_det_fun.sl_dets_with_n_j_p(orb_arr, 
+                                       Nelec, 
+                                       Jz_tot, 
+                                       Parity_tot, 
+                                       qubit_converter,
+                                       tappering_on)
 
-
-SD_sym = []
-for i in range(2**Nq):
-  bn = bin(i)[2:].zfill(Nq)
-
-  wf_bn = bin_to_vec(bn)
-
-  jz = np.conj( wf_bn.T ).dot( Jz_mtrx.dot( wf_bn )).item(0)
-  parity = np.conj( wf_bn.T ).dot( Parity_mtrx.dot( wf_bn )).item(0)
-  npart = np.conj(wf_bn.T).dot( N_part_mtrx.dot( wf_bn) ).item(0)
-
-  found = False
-  for el in SD_sym:
-    if el.n == npart and el.p == parity and el.j == jz:
-      el.bn_arr.append(bn)
-      found = True
-      break
-
-  if not found:
-    SD_sym.append( sl_dets_with_symmetries(bn, npart, parity, jz) )
-
-
-
-counter = 0
+print("\nWave functions with given symmetries = ", len(SD_sym))
 E_bst = 100
-print("\nWave functions with given symmetries")
-print(" "*(Nq+4), f'{"HF energy":>10}')
-for el in SD_sym:
-  if int(el.n) != Nelec:
-    continue
+for bn in SD_sym:
+  wf_bn_i = bin_to_vec(bn)
 
-  if el.p != Parity_tot:
-    continue
-  
-  if el.j != Jz_tot:
-    continue
+  E_bn_i = np.conj( wf_bn_i.T ).dot( H_mtrx.dot( wf_bn_i )).item(0)
+  if E_bn_i < E_bst:
+    E_bst = E_bn_i
+    psi_i_bn = bn
 
-  print("J_z = ", el.j, "P = ", int(el.p), "N_SlDet = ", len(el.bn_arr))
-  for b in el.bn_arr:
-    wf_bn = bin_to_vec(b)
-    E_bn = np.conj( wf_bn.T ).dot( H_mtrx.dot( wf_bn )).item(0)
+print('\n','Best approximation for the ground state')
+print('bin(w.f.)', '  Energy')
+print(psi_i_bn, f'  {E_bst: .8f}')
 
-    if E_bn < E_bst:
-      E_bst = E_bn
-      psi_i_bn = b
-    
-    print(b, E_bn)
-  print()
-#print("Possible input function", psi_i_bn)
+# For HE ansatz
+if ansatz_tp == 0:
+  psi_i_bn = bin(0)[2:].zfill(Nq)
 #exit()
 # -------------------------------------------------------------------
 
@@ -588,7 +343,8 @@ for i, ne in enumerate(ne_arr):
   #indx = np.argsort( abs(wf[:,indx_g[i]]), axis=0 )
 
   jz_g = np.conj( wf[:,indx_g[i]].T ).dot( 
-    Jz_mtrx.dot( wf[:,indx_g[i]] )).item(0)
+    Jz_mtrx.dot( wf[:,indx_g[i]] )
+    ).item(0)
   
   parity_g = int(np.conj( wf[:,indx_g[i]].T ).dot( 
     Parity_mtrx.dot( wf[:,indx_g[i]] )).item(0))
@@ -596,12 +352,12 @@ for i, ne in enumerate(ne_arr):
 
   if indx_e[i] != -1:
     print(f'{ne: >3}', 
-          f'{energy[indx_g[i]]: 10.5f}', 
-          f'{energy[indx_e[i]]: 10.5f}', 
+          f'{energy[indx_g[i]]: 10.8f}', 
+          f'{energy[indx_e[i]]: 10.8f}', 
           f'{jz_g: 4.1f}')
   else:
     print(f'{ne: >3}', 
-          f'{energy[indx_g[i]]: 10.5f}', 
+          f'{energy[indx_g[i]]: 10.8f}', 
           " "*10,
           f'{jz_g: 4.1f}')
 #exit()
@@ -682,7 +438,10 @@ psi_in = bin_to_vec(psi_i_bn)
 
 # Preparation -------------------------------------------------------
 if ansatz_tp == 0:
-  ansatz = ansatz.hardware_efficient_ansatz(Nlayers, Nq, rot_exc)
+  ansatz = ansatz.hardware_efficient_ansatz(Nlayers, 
+                                            Nq, 
+                                            rot_exc, 
+                                            split_ent_layers)
 
 if ansatz_tp == 1:
   ansatz = ansatz.two_qubit_rot_ansatz(Nlayers, Nq)
@@ -696,15 +455,32 @@ if ansatz_tp == 2:
 
   print("\nTotal number of cluster operators = ", len(UCC_ClOps))
 
+  from qiskit.opflow.primitive_ops.pauli_sum_op import PauliSumOp
+  from qiskit.aqua.operators.legacy import WeightedPauliOperator
+
   num_excs = np.zeros(Nelec, dtype=int)
+  N_cnot = 0
+  N_tot = 0
   for x in UCC_ClOps:
     if x.nex in rot_exc:
       num_excs[x.nex-1] += 1
       x.q_op(qubit_converter, Nelec)
-      x.Tq = tappering.tapper(x.Tq, Nq+1, Nelec%2)
-      x.Tq = tappering.tapper(x.Tq, iq_even_first-1, Parity_tot)
+      if tappering_on:
+        x.Tq = tappering.tapper(x.Tq, Nq+1, Nelec%2)
+        x.Tq = tappering.tapper(x.Tq, iq_even_first-1, Parity_tot)
       x.mtrx()
-    
+      #print(x.Tq)
+
+      for h in x.Tq.primitive.to_list():
+        pauli_dict = {'paulis': [{"coeff": {"imag": h[1].imag, "real": h[1].real }, "label": h[0]}]}
+        operator = WeightedPauliOperator.from_dict(pauli_dict)
+        circ = operator.evolve(evo_time= 1, num_time_slices=1).decompose()
+        N_cnot += circ.num_nonlocal_gates()
+        N_tot += circ.size()
+
+
+      #exit()
+
   print("Used ", sum(num_excs) )
   exc_dct = {1:"Single", 
              2:"Double", 
@@ -715,15 +491,43 @@ if ansatz_tp == 2:
     if ex == 0:
       continue
     print(f'{exc_dct[i+1]:>10}', f'{ex:>3}' )
+    
+  print("N_tot = ", N_tot, "N_cnot = ", N_cnot)
+  #exit()
 
   ansatz = ansatz.UCC_ansatz(UCC_ClOps, rot_exc)
+
+
+if ansatz_tp == 3:
+  if tappering_on:
+    S_ClOp = UCC_mod.s_cluster_operators(Nq+2)
+  else:
+    S_ClOp = UCC_mod.s_cluster_operators(Nq)
+
+  for x in S_ClOp:
+    x.q_op(qubit_converter, Nelec)
+    if tappering_on:
+      x.Tq = tappering.tapper(x.Tq, Nq+1, Nelec%2)
+      x.Tq = tappering.tapper(x.Tq, iq_even_first-1, Parity_tot)
+    x.q_act_on()
+    x.mtrx()
+    if len(x.q) == 0:
+      continue
+    print("ann = ", x.ann, "crt = ", x.crt, 
+          "\n",x.Tq, 
+          "\n",x.q)
+    
+  ansatz = ansatz.new_ansatz(S_ClOp, Nlayers)
+  #exit()
 
 
 Nparam = ansatz.nparams 
 print("Total number of parameters in anzatz = ", Nparam, flush=True)
 
-rot_angs = math.pi*(2*np.random.rand(Nparam)-1)
-#rot_angs = np.zeros(Nparam)
+if ansatz_tp == 0:
+  rot_angs = math.pi*(2*np.random.rand(Nparam)-1)
+else:
+  rot_angs = np.zeros(Nparam)
 
 
 def calculate_E(angs, psi_in):
@@ -738,8 +542,8 @@ NG = optimizers.NatGrad_cls(Nparam, eta=0.05)
 ITE = optimizers.ITE_cls(Nparam, eta=0.05)
 
 #optims = [adam, NG, ITE]
-#optims = [adam, NG]
-optims = [adam]
+optims = [adam, NG]
+#optims = [adam]
 
 angs = [rot_angs.copy()] * len(optims)
 E_old = [None] * len(optims)
@@ -749,7 +553,7 @@ for i,opt in enumerate(optims):
 
 
 
-Niters_max = 2000
+Niters_max = 1000
 eps = 1.e-8
 
 txt = ""
@@ -765,7 +569,7 @@ while any([not x.converged for x in optims]) and \
 
   for i,opt in enumerate(optims):
     if opt.converged:
-      txt_out += " "*10
+      txt_out += f' {opt.f: .6f}'
       continue
     
     angs[i] = optimizers.update_angles(ansatz, angs[i], 
@@ -776,48 +580,53 @@ while any([not x.converged for x in optims]) and \
     if abs(opt.f - E_old[i]) < eps:
       opt.converged = True
 
-    txt_out += f' {opt.f: .6f}'
+    txt_out += f' {opt.f: .8f}'
 
-  if iters%50 == 0:
-    print(f'{iters:>5}', txt_out)
+  #if iters%10 == 0:
+  print(f'{iters:>5}', txt_out, flush=True)
     
   iters += 1
-      
-      
+
+
 
 psi_out = []
-txt_E = f'{energy[indx_g[Nelec]]: .5f}'
+txt_E = f'{energy[indx_g[Nelec]]: .8f}'
 txt_name = "  Exact   "
+txt_diff = "   diff   "
 for i,opt in enumerate(optims):
+  #print("Rotation angles:", angs[i])
   psi_out.append( ansatz.act_on_vctr(angs[i], psi_in) )
 
   txt_name += "   " + opt.name + "   "
-  txt_E += f' {opt.f: .6f}'
+  txt_E += f' {opt.f: .8f}'
+  txt_diff += f'{abs(opt.f-energy[indx_g[Nelec]]): .1e}'
 
-print("\n",txt_name, "\n", txt_E, "\n")
+print("\n",txt_name, "\n", txt_E, "\n", txt_diff, "\n")
+exit()
+
 
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-#for i in range(2**Nq):
-  #if any([abs(psi[i])**2 > 1.e-5 for psi in psi_out]):
-    #bn = bin(i)[2:].zfill(Nq)
+for i in range(2**Nq):
+  if any([abs(psi[i])**2 > 1.e-5 for psi in psi_out]):
+    bn = bin(i)[2:].zfill(Nq)
 
-    #wf_bn = bin_to_vec(bn)
+    wf_bn = bin_to_vec(bn)
 
-    #jz = np.conj( wf_bn.T ).dot( Jz_mtrx.dot( wf_bn )).item(0)
-    #npart = np.conj(wf_bn.T).dot( N_part_mtrx.dot( wf_bn) ).item(0)
+    jz = np.conj( wf_bn.T ).dot( Jz_mtrx.dot( wf_bn )).item(0)
+    npart = np.conj(wf_bn.T).dot( N_part_mtrx.dot( wf_bn) ).item(0)
 
-    #txt_out = str(bn)
-    #if abs(psi_exact[i])**2 > 1.e-5:
-      #txt_out = yellow_highlighting(txt_out)
+    txt_out = str(bn)
+    if abs(psi_exact[i])**2 > 1.e-5:
+      txt_out = yellow_highlighting(txt_out)
 
-    #txt_out += f'{abs(psi_exact[i])**2: .5f}'
+    txt_out += f'{abs(psi_exact[i])**2: .5f}'
 
-    #for psi in psi_out:
-      #txt_out += f'{abs(psi[i].item())**2: .5f}'
+    for psi in psi_out:
+      txt_out += f'{abs(psi[i].item())**2: .5f}'
       
-    #print( txt_out, jz, npart )
+    print( txt_out, jz, npart )
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 

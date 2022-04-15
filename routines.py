@@ -56,30 +56,6 @@ def average_value_for_bn_mtrx(bn, mtrx):
 
 
 # ===================================================================
-def get_jz( orb_arr, bn ):
-  jz = 0
-  for i,x in enumerate(bn):
-    jz += orb_arr[len(bn)-1-i].m * int(x)
-    
-  return jz
-# ===================================================================
-
-
-
-
-# ===================================================================
-def get_parity( orb_arr, bn ):
-  parity = 0
-  for i,x in enumerate(bn):
-    parity += orb_arr[len(bn)-1-i].l * int(x)
-    
-  return parity%2
-# ===================================================================
-
-
-
-
-# ===================================================================
 def bin_to_conf( orb_arr, bn ):
   sz = len(orb_arr)
   

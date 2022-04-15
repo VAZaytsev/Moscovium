@@ -1,12 +1,25 @@
-OBI = z115_1-int.txt
-TBI = z115_2-int.txt
+OBI = z115_1e_7s7p8s8p.txt
+TBI = z115_2e_7s7p8s8p.txt
+
 Nelec = 5
 Parity = 1
 Jz = 0.5
-norb = 8
-ansatz_tp = 2
+
+basis = begin
+7s1
+7p1
+7p3
+basis = end
+
+tappering = True
+
+# ansatzes: he, ducc
+ansatz_tp = he
 Nlayers = 1
-rot_exc = [1, 2]
+rot_exc = [1,2]
+split = True
+
 Q_on = False
 noise_off = True
 Nrep = 1
+

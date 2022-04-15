@@ -12,6 +12,8 @@ class ClusterOperator():
     self.ann = ann
     self.crt = crt
     self.nex = len(crt)
+    self.q = []
+
 
   def fer_op(self, nq):
     T = FermionicOp("", register_length=nq)
@@ -22,8 +24,10 @@ class ClusterOperator():
     T -= ~T
     self.T = T.reduce()
 
+
   def q_op(self, q_converter, num_part):
     self.Tq = q_converter.convert(self.T, num_particles=num_part)
+
 
   def mtrx(self):
     # the matrix is real and antihermitian (T^+ = -T)
@@ -43,6 +47,18 @@ class ClusterOperator():
                                       )
                              )
           break
+
+
+  def q_act_on(self):
+    nq = self.Tq.num_qubits
+
+    for x in self.Tq.primitive.to_list():
+      for i, ps in enumerate(x[0]):
+        if ps != "I" and not nq-1-i in self.q:
+          self.q.append(nq-1-i)
+
+    self.q = sorted(self.q, reverse=True)
+          
 # ===================================================================
 
 
@@ -105,6 +121,52 @@ def create_cluster_operators(psi_bn_p_tappered,
 
           cluster_ops.append( ClusterOperator(list(crt), ann) )
           cluster_ops[-1].fer_op(nq)
+
+  return cluster_ops
+# ===================================================================
+
+
+# ===================================================================
+def s_cluster_operators(nq):
+  cluster_ops = []
+
+  # Singles of only closest neighbours
+  for i in range(nq-1):
+    ann = [i]
+    crt = [i+1]
+
+    cluster_ops.append( ClusterOperator(crt, ann) )
+    cluster_ops[-1].fer_op(nq)
+    
+  # Doubles 1100-0011
+  #for i in range(nq):
+    #if i+3 >= nq:
+      #continue
+    #ann = [i,i+1]
+    #crt = [i+2,i+3]
+
+    #cluster_ops.append( ClusterOperator(crt, ann) )
+    #cluster_ops[-1].fer_op(nq)
+
+  # Doubles 1010-0101
+  for i in range(nq):
+    if i+3 >= nq:
+      continue
+    ann = [i,i+2]
+    crt = [i+1,i+3]
+
+    cluster_ops.append( ClusterOperator(crt, ann) )
+    cluster_ops[-1].fer_op(nq)
+
+  # Doubles 0110-1001
+  #for i in range(nq):
+    #if i+3 >= nq:
+      #continue
+    #ann = [i,i+3]
+    #crt = [i+1,i+2]
+
+    #cluster_ops.append( ClusterOperator(crt, ann) )
+    #cluster_ops[-1].fer_op(nq)
 
   return cluster_ops
 # ===================================================================

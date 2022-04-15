@@ -76,6 +76,7 @@ class ansatz_cls:
     self.nparams = sum([layer.get_num_params() 
                         for layer in self.layers])
 
+
   def act_on_vctr(self, args, vctr_in):
     vctr_out = vctr_in.copy()
 
@@ -110,123 +111,6 @@ class ansatz_cls:
 
 
 # ===================================================================
-def hardware_efficient_ansatz(Nlayers, Nq, rot):
-  # in rot can be any number of rotations
-  # values can be only 1,2, or 3 related to Rx, Ry, and Rz, respectively
-  #
-  # --- rot[1](ang_0) --- rot[2](ang_4) ---.-----
-  #                                        |
-  # --- rot[1](ang_1) --- rot[2](ang_5) ---x-.---
-  #                                          |
-  # --- rot[1](ang_2) --- rot[2](ang_6) ---.-x---
-  #                                        |
-  # --- rot[1](ang_3) --- rot[2](ang_7) ---x-----
-  #
-  # + final layer of rotations
-  ansatz = ansatz_cls()
-  layer_rot = []
-  for r in rot:
-    layer_rot.append( layer_cls() )
-    for iq in range(Nq):
-      if int(r) == 1:
-        layer_rot[-1].add_gate(iq, iq, Rx_mtrx, dRx_mtrx)
-      if int(r) == 2:
-        layer_rot[-1].add_gate(iq, iq, Ry_mtrx, dRy_mtrx)
-      if int(r) == 3:
-        layer_rot[-1].add_gate(iq, iq, Rz_mtrx, dRz_mtrx)
-    layer_rot[-1].sort()
-
-
-  layer_ent1 = layer_cls()
-  layer_ent2 = layer_cls()
-  for iq in range(0,Nq,2):
-    if iq+1 < Nq:
-      layer_ent1.add_gate(iq+1,iq,C0X1_mtrx)
-    if iq+1 < Nq and iq+2 < Nq:
-      layer_ent2.add_gate(iq+2,iq+1,C0X1_mtrx)
-
-  for ilayer in range(Nlayers):
-    for layer in layer_rot:
-      ansatz.layers.append(layer)
-
-    ansatz.layers.append(layer_ent1)
-    ansatz.layers.append(layer_ent2)
-
-  # last layer of rotations
-  for layer in layer_rot:
-    ansatz.layers.append(layer)
-
-  ansatz.clc_nparams()
-  return ansatz
-# ===================================================================
-
-
-# ===================================================================
-def two_qubit_rot_ansatz(Nlayers, Nq):
-  #      _______
-  # --- |       | -------------
-  #     | ang_0 |      _______
-  # --- |_______| --- |       |
-  #      _______      | ang_2 |
-  # --- |       | --- |_______|
-  #     | ang_1 |
-  # --- |_______| -------------
-  #
-  ansatz = ansatz_cls()
-
-  layer_ent1 = layer_cls()
-  layer_ent2 = layer_cls()
-  for iq in range(0,Nq,2):
-    if iq+1 < Nq:
-      layer_ent1.add_gate(iq+1, iq, fSim_3cx_mtrx, dfSim_3cx_mtrx)
-
-    if iq+1 < Nq and iq+2 < Nq:
-      layer_ent2.add_gate(iq+2, iq+1, fSim_3cx_mtrx, dfSim_3cx_mtrx)
-      
-  for ilayer in range(Nlayers):
-    ansatz.layers.append(layer_ent1)
-    ansatz.layers.append(layer_ent2)
-  
-  ansatz.clc_nparams()
-  return ansatz
-# ===================================================================
-
-
-# ===================================================================
-def UCC_ansatz(ClusterOps, exc):
-  ansatz = ansatz_cls()
-
-  def mtrx_fun(ClOp):
-    def f(x):
-      res = np.zeros( ClOp.P[0].shape, dtype=complex )
-      for i, e in enumerate(ClOp.e_val):
-        res += cmath.exp(e * x) * ClOp.P[i]
-      return res
-    return f
-
-  def dmtrx_fun(ClOp):
-    def f(x):
-      res = np.zeros( ClOp.P[0].shape, dtype=complex )
-      for i, e in enumerate(ClOp.e_val):
-        res += e * cmath.exp(e * x) * ClOp.P[i]
-      return res
-    return f
-
-  nq = ClusterOps[0].Tq.num_qubits
-
-  for ClusterOp in ClusterOps:
-    if ClusterOp.nex in exc:
-      layer = layer_cls()
-      layer.add_gate(nq-1, 0, 
-                     mtrx_fun(ClusterOp), dmtrx_fun(ClusterOp))
-      ansatz.layers.append(layer)
-
-  ansatz.clc_nparams()
-  return ansatz
-# ===================================================================
-
-
-# ===================================================================
 class layer_cls:
   def __init__(self):
     self.rules = []
@@ -234,8 +118,19 @@ class layer_cls:
     self.qr = []
     self.drules = []
 
-  
+  def is_idle(self, q):
+    if min(self.qr) > q:
+      return True
+    if q > max(self.ql):
+      return True
+    for i,r in enumerate(self.qr):
+      if q >= r and q <= self.ql[i]:
+        return False
+    return True
+      
+
   def add_gate(self, ql, qr, mtrx_fun, dmtrx_fun=None):
+    # ... q3 q2 q1 q0
     if ql < qr:
       exit("Wrong values for ql and qr")
       
@@ -331,4 +226,169 @@ class layer_cls:
       res[i] = tmp_arr[i].dot( res[i] ).reshape(2**nq,1)
     
     return res
+# ===================================================================
+
+
+# ===================================================================
+def hardware_efficient_ansatz(Nlayers, Nq, rot, split_ent_layers):
+  # in rot can be any number of rotations
+  # values can be only 1,2, or 3 related to Rx, Ry, and Rz, respectively
+  #
+  # --- rot[1](ang_0) --- rot[2](ang_4) ---.-----
+  #                                        |
+  # --- rot[1](ang_1) --- rot[2](ang_5) ---x-.---
+  #                                          |
+  # --- rot[1](ang_2) --- rot[2](ang_6) ---.-x---
+  #                                        |
+  # --- rot[1](ang_3) --- rot[2](ang_7) ---x-----
+  #
+  # + final layer of rotations
+  ansatz = ansatz_cls()
+  layer_rot = []
+  for r in rot:
+    layer_rot.append( layer_cls() )
+    for iq in range(Nq):
+      if int(r) == 1:
+        layer_rot[-1].add_gate(iq, iq, Rx_mtrx, dRx_mtrx)
+      if int(r) == 2:
+        layer_rot[-1].add_gate(iq, iq, Ry_mtrx, dRy_mtrx)
+      if int(r) == 3:
+        layer_rot[-1].add_gate(iq, iq, Rz_mtrx, dRz_mtrx)
+    layer_rot[-1].sort()
+
+
+  layer_ent1 = layer_cls()
+  layer_ent2 = layer_cls()
+  for iq in range(0,Nq,2):
+    if iq+1 < Nq:
+      layer_ent1.add_gate(iq+1,iq,C0X1_mtrx)
+    if iq+1 < Nq and iq+2 < Nq:
+      layer_ent2.add_gate(iq+2,iq+1,C0X1_mtrx)
+
+  for ilayer in range(Nlayers):
+    for layer in layer_rot:
+      ansatz.layers.append(layer)
+
+    ansatz.layers.append(layer_ent1)
+
+    if split_ent_layers:
+      for layer in layer_rot:
+        ansatz.layers.append(layer)
+
+    ansatz.layers.append(layer_ent2)
+
+  # last layer of rotations
+  for layer in layer_rot:
+    ansatz.layers.append(layer)
+
+  ansatz.clc_nparams()
+  return ansatz
+# ===================================================================
+
+
+# ===================================================================
+def two_qubit_rot_ansatz(Nlayers, Nq):
+  #      _______
+  # --- |       | -------------
+  #     | ang_0 |      _______
+  # --- |_______| --- |       |
+  #      _______      | ang_2 |
+  # --- |       | --- |_______|
+  #     | ang_1 |
+  # --- |_______| -------------
+  #
+  ansatz = ansatz_cls()
+
+  layer_ent1 = layer_cls()
+  layer_ent2 = layer_cls()
+  for iq in range(0,Nq,2):
+    if iq+1 < Nq:
+      layer_ent1.add_gate(iq+1, iq, fSim_3cx_mtrx, dfSim_3cx_mtrx)
+
+    if iq+1 < Nq and iq+2 < Nq:
+      layer_ent2.add_gate(iq+2, iq+1, fSim_3cx_mtrx, dfSim_3cx_mtrx)
+      
+  for ilayer in range(Nlayers):
+    ansatz.layers.append(layer_ent1)
+    ansatz.layers.append(layer_ent2)
+  
+  ansatz.clc_nparams()
+  return ansatz
+# ===================================================================
+
+
+# ===================================================================
+def UCC_ansatz(ClusterOps, exc):
+  ansatz = ansatz_cls()
+
+  def mtrx_fun(ClOp):
+    def f(x):
+      res = np.zeros( ClOp.P[0].shape, dtype=complex )
+      for i, e in enumerate(ClOp.e_val):
+        res += cmath.exp(e * x) * ClOp.P[i]
+      return res
+    return f
+
+  def dmtrx_fun(ClOp):
+    def f(x):
+      res = np.zeros( ClOp.P[0].shape, dtype=complex )
+      for i, e in enumerate(ClOp.e_val):
+        res += e * cmath.exp(e * x) * ClOp.P[i]
+      return res
+    return f
+
+  nq = ClusterOps[0].Tq.num_qubits
+
+  for ClusterOp in ClusterOps:
+    if ClusterOp.nex in exc:
+      layer = layer_cls()
+      layer.add_gate(nq-1, 0, 
+                     mtrx_fun(ClusterOp), dmtrx_fun(ClusterOp))
+      ansatz.layers.append(layer)
+
+  ansatz.clc_nparams()
+  return ansatz
+# ===================================================================
+
+
+# ===================================================================
+def new_ansatz(ClusterOps, Nlayers):
+  ansatz = ansatz_cls()
+
+
+  def mtrx_fun(ClOp):
+    def f(x):
+      res = np.zeros( ClOp.P[0].shape, dtype=complex )
+      for i, e in enumerate(ClOp.e_val):
+        res += cmath.exp(e * x) * ClOp.P[i]
+      return res
+    return f
+
+
+  def dmtrx_fun(ClOp):
+    def f(x):
+      res = np.zeros( ClOp.P[0].shape, dtype=complex )
+      for i, e in enumerate(ClOp.e_val):
+        res += e * cmath.exp(e * x) * ClOp.P[i]
+      return res
+    return f
+
+
+  nq = ClusterOps[0].Tq.num_qubits
+
+  layers_arr = []
+  for i,x in enumerate(ClusterOps):
+    if len(x.q) == 0:
+      continue
+    layer = layer_cls()
+    layer.add_gate(nq-1, 0, mtrx_fun(x), dmtrx_fun(x))
+    layers_arr.append(layer)
+
+    
+  for ilayer in range(Nlayers):
+    for layer in layers_arr:
+      ansatz.layers.append(layer)
+
+  ansatz.clc_nparams()
+  return ansatz
 # ===================================================================
